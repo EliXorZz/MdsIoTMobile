@@ -1,29 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DeviceList } from "@/components/explore/device-list";
+import { MetricSelector } from "@/components/explore/metric-selector";
+import { RoomSelector } from "@/components/explore/room-selector";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { WebBadge } from "@/components/web-badge";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { POLLING_INTERVAL_MS } from "@/constants/api";
+import {
+  BottomTabInset,
+  ExtraWideBreakpoint,
+  MaxContentWidth,
+  Radius,
+  Spacing,
+  WideBreakpoint,
+} from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
+import { useGetDevicesQuery } from "@/store/api";
+import { AVAILABLE_METRICS, type Metric, type Room } from "@/types/telemetry";
 
-const API_URL = "http://10.182.28.105:8000/api/data";
-
-type SensorData = {
-  id: number;
-  temperature: number;
-  humidity: number;
-  created_at: string;
-};
-
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
   const safeAreaInsets = useSafeAreaInsets();
 
   const insets = {
@@ -33,125 +37,194 @@ export default function TabTwoScreen() {
 
   const theme = useTheme();
 
-  const [data, setData] = useState<SensorData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
+  const isWide = width >= WideBreakpoint;
+  const isExtraWide = width >= ExtraWideBreakpoint;
+  const cardWidthPercent = isExtraWide ? "32%" : isWide ? "48%" : "100%";
+
+  // Une seule requête, mise en cache et rafraîchie au rythme des données du simulateur.
+  const {
+    data: devices = [],
+    isLoading,
+    error,
+    refetch,
+  } = useGetDevicesQuery(undefined, {
+    pollingInterval: POLLING_INTERVAL_MS,
+  });
+
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<Metric | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const rooms: Room[] = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          devices.map((device) => [
+            device.room_id,
+            { id: device.room_id, name: device.room_id },
+          ]),
+        ).values(),
+      ),
+    [devices],
+  );
+
+  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+
+  const roomDevices = useMemo(
+    () => devices.filter((device) => device.room_id === selectedRoomId),
+    [devices, selectedRoomId],
+  );
+
+  const availableMetrics = useMemo(
+    () =>
+      AVAILABLE_METRICS.filter((metric) =>
+        roomDevices.some(
+          (device) => device.latest_telemetry?.[metric.key] !== undefined,
+        ),
+      ),
+    [roomDevices],
+  );
+
+  // Sélectionne automatiquement la première métrique disponible pour la salle choisie.
+  useEffect(() => {
+    if (!selectedMetric && availableMetrics.length > 0) {
+      setSelectedMetric(availableMetrics[0]);
+    }
+  }, [availableMetrics, selectedMetric]);
+
+  const handleRoomChange = (room: Room) => {
+    setSelectedRoomId(room.id);
+    setSelectedMetric(null);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      setError(null);
-
-      const response = await fetch(API_URL);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-
-      setData(json);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Impossible de récupérer les données",
-      );
+      await refetch();
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
   return (
     <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
+      style={[
+        styles.scrollView,
+        {
+          backgroundColor: theme.background,
+        },
+      ]}
       contentInset={insets}
       contentContainerStyle={[
         styles.contentContainer,
         {
           paddingTop: Platform.OS === "web" ? Spacing.six : insets.top,
+
           paddingBottom: Platform.OS === "web" ? Spacing.four : insets.bottom,
         },
       ]}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={theme.text}
+          colors={[theme.tint]}
+        />
       }
     >
       <ThemedView style={styles.container}>
+        {/* HEADER */}
         <ThemedView style={styles.header}>
-          <ThemedText type="title">Données des capteurs</ThemedText>
+          <ThemedView type="backgroundElement" style={styles.eyebrow}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Capteurs IoT
+            </ThemedText>
+          </ThemedView>
 
-          <ThemedText type="small" themeColor="textSecondary">
-            Dernières mesures reçues
+          <ThemedText type="title" style={styles.title}>
+            Données des capteurs
+          </ThemedText>
+
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            style={styles.subtitle}
+          >
+            Sélectionnez une salle et une métrique pour visualiser les dernières
+            mesures.
           </ThemedText>
         </ThemedView>
 
-        {loading && (
-          <ThemedView style={styles.center}>
-            <ActivityIndicator size="large" />
-            <ThemedText type="small">Chargement des données...</ThemedText>
-          </ThemedView>
-        )}
-
+        {/* ERREUR */}
         {error && (
-          <ThemedView type="backgroundElement" style={styles.errorCard}>
-            <ThemedText type="subtitle">Erreur</ThemedText>
+          <ThemedView
+            type="backgroundElement"
+            style={[styles.errorCard, { borderColor: theme.danger }]}
+          >
+            <ThemedText type="smallBold" style={{ color: theme.danger }}>
+              ⚠ Erreur
+            </ThemedText>
 
-            <ThemedText type="small">{error}</ThemedText>
-          </ThemedView>
-        )}
-
-        {!loading && !error && data.length === 0 && (
-          <ThemedView type="backgroundElement" style={styles.emptyCard}>
-            <ThemedText type="subtitle">Aucune donnée</ThemedText>
-
-            <ThemedText type="small">
-              Aucun relevé n'a encore été reçu.
+            <ThemedText type="small" themeColor="textSecondary">
+              Impossible de récupérer les capteurs.
             </ThemedText>
           </ThemedView>
         )}
 
-        {!loading && !error && data.length > 0 && (
-          <ThemedView style={styles.dataList}>
-            {data.map((item) => (
-              <ThemedView
-                key={item.id}
-                type="backgroundElement"
-                style={styles.dataCard}
-              >
-                <ThemedView style={styles.cardHeader}>
-                  <ThemedText type="subtitle">Mesure #{item.id}</ThemedText>
+        {/* SALLES */}
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Salle
+          </ThemedText>
 
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {new Date(item.created_at).toLocaleString()}
-                  </ThemedText>
-                </ThemedView>
+          <RoomSelector
+            rooms={rooms}
+            selectedRoom={selectedRoom}
+            onSelect={handleRoomChange}
+            loading={isLoading}
+          />
+        </ThemedView>
 
-                <ThemedView style={styles.values}>
-                  <ThemedView style={styles.value}>
-                    <ThemedText type="small">Température</ThemedText>
+        {/* METRICS */}
+        {selectedRoom && (
+          <ThemedView style={styles.section}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Métrique
+            </ThemedText>
 
-                    <ThemedText type="title">{item.temperature} °C</ThemedText>
-                  </ThemedView>
+            <MetricSelector
+              metrics={availableMetrics}
+              selectedMetric={selectedMetric}
+              onSelect={setSelectedMetric}
+              loading={isLoading}
+            />
+          </ThemedView>
+        )}
 
-                  <ThemedView style={styles.value}>
-                    <ThemedText type="small">Humidité</ThemedText>
+        {/* DONNÉES */}
+        {selectedRoom && selectedMetric && (
+          <ThemedView style={styles.section}>
+            <ThemedView
+              type="backgroundElement"
+              style={[styles.measurementHeader, { borderColor: theme.border }]}
+            >
+              <ThemedView>
+                <ThemedText type="subtitle">{selectedMetric.name}</ThemedText>
 
-                    <ThemedText type="title">{item.humidity} %</ThemedText>
-                  </ThemedView>
-                </ThemedView>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {selectedRoom.name} · {roomDevices.length} capteur
+                  {roomDevices.length > 1 ? "s" : ""}
+                </ThemedText>
               </ThemedView>
-            ))}
+            </ThemedView>
+
+            <DeviceList
+              devices={roomDevices}
+              metric={selectedMetric}
+              loading={isLoading}
+              cardWidthPercent={cardWidthPercent}
+            />
           </ThemedView>
         )}
 
@@ -185,51 +258,48 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
   },
 
-  center: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.three,
-    padding: Spacing.six,
+  eyebrow: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.half,
+    borderRadius: Radius.full,
   },
 
-  dataList: {
+  title: {
+    textAlign: "center",
+  },
+
+  subtitle: {
+    textAlign: "center",
+    maxWidth: 320,
+  },
+
+  sectionTitle: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
+
+  section: {
     gap: Spacing.three,
     paddingHorizontal: Spacing.four,
+    marginBottom: Spacing.four,
   },
 
-  dataCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
-    gap: Spacing.four,
-  },
-
-  cardHeader: {
-    gap: Spacing.one,
-  },
-
-  values: {
+  measurementHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: Spacing.four,
-  },
-
-  value: {
-    flex: 1,
-    gap: Spacing.one,
+    alignItems: "center",
+    padding: Spacing.four,
+    borderRadius: Radius.large,
+    borderWidth: 1,
+    marginBottom: Spacing.three,
   },
 
   errorCard: {
     marginHorizontal: Spacing.four,
     padding: Spacing.four,
-    borderRadius: Spacing.four,
+    borderRadius: Radius.large,
+    borderWidth: 1,
     gap: Spacing.two,
-  },
-
-  emptyCard: {
-    marginHorizontal: Spacing.four,
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
-    alignItems: "center",
-    gap: Spacing.two,
+    marginBottom: Spacing.four,
   },
 });
