@@ -2,21 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ListCommandResultsRequest;
+use App\Http\Requests\ListDevicesRequest;
+use App\Http\Requests\ListTelemetryRequest;
 use App\Http\Resources\CommandResultResource;
 use App\Http\Resources\DeviceResource;
 use App\Http\Resources\TelemetryResource;
 use App\Models\Device;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DeviceController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(ListDevicesRequest $request): AnonymousResourceCollection
     {
         $query = Device::with('latestTelemetry');
 
         if ($request->has('online')) {
-            $query->where('online', filter_var($request->online, FILTER_VALIDATE_BOOLEAN));
+            $query->where('online', $request->boolean('online'));
         }
 
         if ($request->has('room_id')) {
@@ -35,14 +37,8 @@ class DeviceController extends Controller
         );
     }
 
-    public function telemetry(Request $request, Device $device): AnonymousResourceCollection
+    public function telemetry(ListTelemetryRequest $request, Device $device): AnonymousResourceCollection
     {
-        $request->validate([
-            'from'     => ['nullable', 'date'],
-            'to'       => ['nullable', 'date'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
-        ]);
-
         $query = $device->telemetry()->orderByDesc('observed_at');
 
         if ($from = $request->input('from')) {
@@ -58,13 +54,8 @@ class DeviceController extends Controller
         );
     }
 
-    public function commands(Request $request, Device $device): AnonymousResourceCollection
+    public function commands(ListCommandResultsRequest $request, Device $device): AnonymousResourceCollection
     {
-        $request->validate([
-            'status'   => ['nullable', 'string'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
-
         $query = $device->commandResults()->orderByDesc('created_at');
 
         if ($status = $request->input('status')) {
