@@ -1,0 +1,594 @@
+# Architecture technique
+
+## 1. Objectif
+
+L'application permet de récupérer des données provenant de capteurs, de les transmettre via MQTT, de les traiter côté backend, de les stocker dans une base de données temporelle et de les rendre accessibles depuis une application mobile.
+
+L'architecture retenue repose sur les composants suivants :
+
+* **Mosquitto** : broker MQTT
+* **Laravel** : backend et API REST
+* **PostgreSQL** : base de données relationnelle
+* **TimescaleDB** : extension PostgreSQL dédiée aux séries temporelles
+* **React Native** : application mobile
+* **Docker** : conteneurisation des différents services
+
+---
+
+## 2. Architecture globale
+
+```mermaid
+flowchart LR
+
+    SENSOR[Capteurs]
+
+    MQTT[Mosquitto<br/>MQTT Broker]
+
+    subgraph LARAVEL["Application Laravel"]
+        CONSUMER[MQTT Consumer]
+        API[REST API]
+    end
+
+    DB[(PostgreSQL<br/>+ TimescaleDB)]
+
+    MOBILE[React Native]
+
+    SENSOR -->|MQTT Publish| MQTT
+    MQTT -->|MQTT Subscribe| CONSUMER
+    CONSUMER -->|SQL| DB
+
+    MOBILE -->|HTTPS / JSON| API
+    API -->|SQL| DB
+```
+
+Le flux est volontairement séparé en deux parties :
+
+### Flux d'acquisition
+
+```text
+Capteur
+   ↓
+Mosquitto
+   ↓
+Laravel MQTT Consumer
+   ↓
+PostgreSQL + TimescaleDB
+```
+
+### Flux applicatif
+
+```text
+React Native
+   ↓ HTTPS
+Laravel API
+   ↓ SQL
+PostgreSQL + TimescaleDB
+```
+
+L'application mobile n'accède donc jamais directement au broker MQTT ou à la base de données.
+
+---
+
+# 3. Flux de données
+
+## 3.1 Acquisition d'une mesure
+
+Lorsqu'un capteur effectue une mesure, celui-ci publie un message MQTT.
+
+Exemple de topic :
+
+```text
+sensors/{sensor_id}/measurements
+```
+
+Exemple de message :
+
+```json
+{
+  "sensor_id": "sensor-001",
+  "timestamp": "2026-09-15T08:30:00Z",
+  "temperature": 21.4,
+  "ppm": 0.2
+}
+```
+
+Le message est envoyé au broker Mosquitto.
+
+```mermaid
+sequenceDiagram
+
+    participant S as 📡 Capteur
+    participant M as 📨 Mosquitto
+    participant L as ⚙️ Laravel Consumer
+    participant DB as 🗄️ TimescaleDB
+
+    S->>M: MQTT PUBLISH
+    M->>L: MQTT MESSAGE
+    L->>L: Validation / transformation
+    L->>DB: INSERT measurement
+    DB-->>L: Confirmation
+```
+
+---
+
+## 3.2 Consultation depuis l'application
+
+Lorsqu'un utilisateur consulte les données depuis l'application mobile :
+
+```mermaid
+sequenceDiagram
+
+    participant M as 📱 React Native
+    participant API as 🌐 Laravel API
+    participant DB as 🗄️ PostgreSQL
+
+    M->>API: GET /api/sensors/1/measurements
+    API->>API: Authentification
+    API->>DB: SELECT measurements
+    DB-->>API: Résultats
+    API-->>M: JSON
+```
+
+---
+
+# 4. Description des composants
+
+## 4.1 Capteurs
+
+Les capteurs sont responsables de la collecte des données physiques.
+
+Exemples :
+
+* température ;
+* humidité ;
+* pression ;
+* luminosité ;
+* qualité de l'air ;
+* consommation énergétique.
+
+Les capteurs communiquent avec le système via le protocole **MQTT**.
+
+Ils ne communiquent pas directement avec Laravel.
+
+---
+
+## 4.2 Mosquitto
+
+**Mosquitto** est utilisé comme broker MQTT.
+
+Il constitue le point central de communication entre les capteurs et le backend.
+
+Ses responsabilités sont :
+
+* réception des messages MQTT ;
+* gestion des topics ;
+* distribution des messages aux clients abonnés ;
+* gestion des connexions MQTT ;
+* éventuellement gestion de l'authentification des clients.
+
+Exemple :
+
+```text
+sensors/
+├── sensor-001/
+│   └── measurements
+├── sensor-002/
+│   └── measurements
+└── sensor-003/
+    └── measurements
+```
+
+Le backend Laravel s'abonne aux topics nécessaires afin de récupérer les mesures.
+
+---
+
+# 5. Backend Laravel
+
+Laravel constitue le cœur applicatif du système.
+
+Il est organisé autour de deux responsabilités principales :
+
+```text
+Laravel
+├── MQTT Consumer
+│   └── Réception et traitement des mesures
+│
+└── REST API
+    └── Communication avec l'application mobile
+```
+
+## 5.1 MQTT Consumer
+
+Le consumer écoute les messages provenant de Mosquitto.
+
+Ses responsabilités sont :
+
+1. récupérer le message MQTT ;
+2. décoder le JSON ;
+3. vérifier les données ;
+4. identifier le capteur ;
+5. transformer les données si nécessaire ;
+6. enregistrer la mesure dans TimescaleDB.
+
+```text
+MQTT Message
+     ↓
+JSON Decode
+     ↓
+Validation
+     ↓
+Transformation
+     ↓
+Persistence
+     ↓
+TimescaleDB
+```
+
+Le consumer doit idéalement fonctionner comme un processus séparé de l'API HTTP.
+
+---
+
+## 5.2 REST API
+
+Laravel fournit une API REST destinée à l'application React Native.
+
+Exemples d'endpoints :
+
+```text
+POST   /api/login
+POST   /api/logout
+
+GET    /api/sensors
+GET    /api/sensors/{id}
+
+GET    /api/sensors/{id}/measurements
+GET    /api/sensors/{id}/measurements/latest
+
+GET    /api/sensors/{id}/statistics
+```
+
+Les réponses sont retournées au format JSON.
+
+Exemple :
+
+```json
+{
+  "sensor_id": "sensor-001",
+  "measurements": [
+    {
+      "timestamp": "2026-09-15T08:30:00Z",
+      "temperature": 21.4,
+      "humidity": 56.2
+    }
+  ]
+}
+```
+
+---
+
+# 6. PostgreSQL + TimescaleDB
+
+La base de données principale est **PostgreSQL**.
+
+L'extension **TimescaleDB** est utilisée pour optimiser le stockage et l'exploitation des données temporelles produites par les capteurs.
+
+## 6.1 Données classiques
+
+Les données métier sont stockées dans PostgreSQL.
+
+Exemple :
+
+```text
+users
+sensors
+sensor_user
+```
+
+## 6.2 Données temporelles
+
+Les mesures sont stockées dans une table dédiée :
+
+```text
+measurements
+```
+
+Exemple de structure :
+
+```text
+measurements
+├── id
+├── sensor_id
+├── time
+├── temperature
+├── humidity
+└── ...
+```
+
+La colonne `time` permet à TimescaleDB de gérer efficacement les séries temporelles.
+
+La table `measurements` sera configurée comme une **hypertable TimescaleDB**.
+
+---
+
+# 7. Application mobile
+
+L'application mobile est développée avec **React Native**.
+
+Elle est responsable de l'interface utilisateur et de la visualisation des données.
+
+Elle communique avec Laravel exclusivement via l'API REST.
+
+```mermaid
+flowchart TB
+
+    RN[📱 React Native]
+
+    AUTH[Authentification]
+    SENSORS[Gestion des capteurs]
+    DATA[Mesures]
+    STATS[Statistiques]
+
+    API[🌐 Laravel API]
+
+    RN --> AUTH
+    RN --> SENSORS
+    RN --> DATA
+    RN --> STATS
+
+    AUTH --> API
+    SENSORS --> API
+    DATA --> API
+    STATS --> API
+```
+
+L'application ne possède aucune connexion directe à PostgreSQL.
+
+---
+
+# 8. Architecture Docker
+
+Les différents composants backend sont conteneurisés avec Docker.
+
+Architecture envisagée :
+
+```mermaid
+flowchart TB
+
+    subgraph Docker["🐳 Docker"]
+
+        API["Laravel API"]
+
+        WORKER["Laravel MQTT Consumer"]
+
+        MQTT["Mosquitto"]
+
+        DB["PostgreSQL + TimescaleDB"]
+
+    end
+
+    MOBILE["📱 React Native"]
+    SENSOR["📡 Capteurs"]
+
+    SENSOR -->|MQTT| MQTT
+    MQTT -->|MQTT| WORKER
+    WORKER -->|SQL| DB
+
+    MOBILE -->|HTTPS| API
+    API -->|SQL| DB
+```
+(Il se trouve que pour ce tp les capteurs sont simulés dans docker)
+## 8.1 Services Docker
+
+Le projet pourra être organisé autour des services suivants :
+
+```text
+docker-compose.yml
+
+services:
+
+  api
+    → Laravel API
+
+  worker
+    → Laravel MQTT Consumer
+
+  mosquitto
+    → MQTT Broker
+
+  postgres
+    → PostgreSQL + TimescaleDB
+```
+
+Exemple d'organisation :
+
+```text
+project/
+├── api/
+│   ├── app/
+│   ├── routes/
+│   ├── database/
+│   └── ...
+│
+├── mobile/
+│   ├── app/
+│   ├── components/
+│   └── ...
+│
+├── docker/
+│   └── mosquitto/
+│       ├── config/
+│       ├── data/
+│       └── log/
+│
+├── docker-compose.yml
+│
+└── docs/
+    └── architecture.md
+```
+
+---
+
+# 9. Réseau Docker
+
+Les services backend communiquent sur un réseau Docker interne.
+
+```text
+                    Docker Network
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+     Laravel         Mosquitto        PostgreSQL
+       API               │           + TimescaleDB
+        │                │                ▲
+        │                ▼                │
+        └──────────── Worker ─────────────┘
+```
+
+La base PostgreSQL et Mosquitto ne sont pas exposés publiquement lorsqu'une exposition externe n'est pas nécessaire.
+
+Seule l'API Laravel est destinée à être accessible depuis l'extérieur.
+
+---
+
+# 10. Sécurité
+
+Plusieurs règles sont retenues :
+
+### API
+
+L'API Laravel est accessible en HTTPS.
+
+```text
+React Native
+      │
+      │ HTTPS
+      ▼
+Laravel API
+```
+
+### Base de données
+
+PostgreSQL n'est pas directement accessible depuis l'application mobile.
+
+```text
+❌ React Native → PostgreSQL
+```
+
+Le seul accès à la base se fait depuis les services backend autorisés.
+
+```text
+✅ Laravel → PostgreSQL
+```
+
+### MQTT
+
+Les capteurs communiquent avec Mosquitto.
+
+Selon l'environnement, Mosquitto pourra utiliser :
+
+* authentification par identifiant/mot de passe ;
+* ACL sur les topics ;
+* MQTT over TLS.
+
+---
+
+# 11. Responsabilités
+
+| Composant        | Responsabilité                |
+| ---------------- | ----------------------------- |
+| 📡 Capteur       | Récupérer les données           |
+| 📨 Mosquitto     | Transporter les messages MQTT |
+| ⚙️ MQTT Consumer | Traiter les mesures           |
+| 🌐 Laravel API   | Exposer les données           |
+| 🗄️ PostgreSQL   | Stocker les données métier    |
+| 📈 TimescaleDB   | Gérer les séries temporelles  |
+| 📱 React Native  | Interface utilisateur         |
+| 🐳 Docker        | Conteneuriser les services    |
+
+---
+
+# 12. Principes retenus
+
+## Découplage
+
+Les capteurs ne connaissent pas le backend.
+
+```text
+Capteur → Mosquitto → Backend
+```
+
+Cela permet d'ajouter ou remplacer des capteurs sans modifier directement l'API.
+
+## Séparation des responsabilités
+
+Le transport des données, leur traitement, leur stockage et leur affichage sont séparés.
+
+```text
+Transport   → MQTT / Mosquitto
+Traitement  → Laravel
+Stockage    → PostgreSQL / TimescaleDB
+API         → Laravel
+UI          → React Native
+```
+
+## Scalabilité
+
+L'architecture permet d'augmenter progressivement :
+
+* le nombre de capteurs ;
+* le nombre de messages MQTT ;
+* le nombre de consommateurs ;
+* le nombre d'utilisateurs mobiles.
+
+Le consumer MQTT étant séparé de l'API, il pourra notamment être dimensionné indépendamment si le volume de données augmente.
+
+---
+
+# 13. Résumé de l'architecture
+
+```text
+                         INTERNET
+                            │
+                            │ HTTPS
+                            ▼
+                    ┌───────────────┐
+                    │ React Native  │
+                    │    Mobile     │
+                    └───────┬───────┘
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │    Laravel    │
+                    │   REST API    │
+                    └───────┬───────┘
+                            │
+                            │ SQL
+                            ▼
+               ┌─────────────────────────┐
+               │ PostgreSQL + TimescaleDB│
+               └─────────────────────────┘
+                            ▲
+                            │ SQL
+                            │
+                    ┌───────┴───────┐
+                    │    Laravel    │
+                    │ MQTT Consumer │
+                    └───────▲───────┘
+                            │
+                            │ MQTT
+                            │
+                    ┌───────┴───────┐
+                    │   Mosquitto   │
+                    │  MQTT Broker  │
+                    └───────▲───────┘
+                            │
+                            │ MQTT
+                            │
+                    ┌───────┴───────┐
+                    │    Capteurs   │
+                    │      📡       │
+                    └───────────────┘
+```
+
+Cette architecture permet ainsi de séparer clairement **l'acquisition des données**, **leur transport**, **leur traitement**, **leur stockage** et **leur consommation par l'utilisateur final**.
