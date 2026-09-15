@@ -47,17 +47,8 @@ class DeviceController extends Controller
         $bucket = $data['bucket'] ?? null;
 
         $query = $bucket
-            ? Telemetry::selectRaw(
-                "time_bucket(? * interval '1 minute', observed_at) AS observed_at,
-                 AVG(temperature)::float AS temperature,
-                 ROUND(AVG(co2))::integer AS co2",
-                [$bucket]
-            )
-            ->where('device_id', $device->device_id)
-            ->groupByRaw("time_bucket(? * interval '1 minute', observed_at)", [$bucket])
-            : $device->telemetry();
-
-        $query->orderByDesc('observed_at');
+            ? $device->telemetry()->bucketed($bucket)->orderByRaw('1 DESC')
+            : $device->telemetry()->orderByDesc('observed_at');
 
         if (($data['from'] ?? null) !== null) {
             $query->where('observed_at', '>=', $data['from']);

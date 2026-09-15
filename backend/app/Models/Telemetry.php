@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Telemetry extends Model
@@ -28,4 +29,16 @@ class Telemetry extends Model
         'temperature' => 'float',
         'co2'         => 'integer',
     ];
+
+    public function scopeBucketed(Builder $query, int $minutes): Builder
+    {
+        return $query
+            ->selectRaw(
+                "time_bucket(? * interval '1 minute', observed_at) AS observed_at,
+                 AVG(temperature)::float AS temperature,
+                 ROUND(AVG(co2))::integer AS co2",
+                [$minutes]
+            )
+            ->groupByRaw('1');
+    }
 }
