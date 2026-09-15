@@ -21,11 +21,11 @@ export const api = createApi({
 
     getDeviceTelemetry: builder.query<
       TelemetryPoint[],
-      { deviceId: string; perPage?: number }
+      { deviceId: string; perPage?: number; bucket?: number }
     >({
-      query: ({ deviceId, perPage = 30 }) => ({
+      query: ({ deviceId, perPage = 30, bucket = 5 }) => ({
         url: `/devices/${deviceId}/telemetry`,
-        params: { per_page: perPage },
+        params: { per_page: perPage, bucket: bucket },
       }),
       // L'API renvoie les mesures les plus récentes en premier ; on les remet dans l'ordre chronologique pour le graphique.
       transformResponse: (response: TelemetryResponse) =>

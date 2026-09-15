@@ -5,6 +5,7 @@ import Svg, { Circle, Line, Polyline } from "react-native-svg";
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
 import type { MetricKey, TelemetryPoint } from "@/types/telemetry";
+import { roundMetricValue } from "@/utils/telemetry";
 
 type Props = {
   points: TelemetryPoint[];
@@ -19,7 +20,7 @@ const CHART_PADDING = 8;
 const Y_AXIS_WIDTH = 44;
 
 function formatValue(value: number, unit: string) {
-  return `${Math.round(value * 10) / 10}${unit}`;
+  return `${roundMetricValue(value)}${unit}`;
 }
 
 function formatTime(observedAt: string) {
