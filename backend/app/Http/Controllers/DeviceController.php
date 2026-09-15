@@ -9,20 +9,23 @@ use App\Http\Resources\CommandResultResource;
 use App\Http\Resources\DeviceResource;
 use App\Http\Resources\TelemetryResource;
 use App\Models\Device;
+use App\Models\Telemetry;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DeviceController extends Controller
 {
     public function index(ListDevicesRequest $request): AnonymousResourceCollection
     {
+        $data = $request->validated();
+
         $query = Device::with('latestTelemetry');
 
-        if ($request->has('online')) {
-            $query->where('online', $request->boolean('online'));
+        if (($data['online'] ?? null) !== null) {
+            $query->where('online', $data['online']);
         }
 
-        if ($request->has('room_id')) {
-            $query->where('room_id', $request->room_id);
+        if (($data['room_id'] ?? null) !== null) {
+            $query->where('room_id', $data['room_id']);
         }
 
         return DeviceResource::collection(
@@ -39,31 +42,48 @@ class DeviceController extends Controller
 
     public function telemetry(ListTelemetryRequest $request, Device $device): AnonymousResourceCollection
     {
-        $query = $device->telemetry()->orderByDesc('observed_at');
+        $data = $request->validated();
 
-        if ($from = $request->input('from')) {
-            $query->where('observed_at', '>=', $from);
+        $bucket = $data['bucket'] ?? null;
+
+        $query = $bucket
+            ? Telemetry::selectRaw(
+                "time_bucket(? * interval '1 minute', observed_at) AS observed_at,
+                 AVG(temperature)::float AS temperature,
+                 ROUND(AVG(co2))::integer AS co2",
+                [$bucket]
+            )
+            ->where('device_id', $device->device_id)
+            ->groupByRaw("time_bucket(? * interval '1 minute', observed_at)", [$bucket])
+            : $device->telemetry();
+
+        $query->orderByDesc('observed_at');
+
+        if (($data['from'] ?? null) !== null) {
+            $query->where('observed_at', '>=', $data['from']);
         }
 
-        if ($to = $request->input('to')) {
-            $query->where('observed_at', '<=', $to);
+        if (($data['to'] ?? null) !== null) {
+            $query->where('observed_at', '<=', $data['to']);
         }
 
         return TelemetryResource::collection(
-            $query->paginate($request->integer('per_page', 100))
+            $query->paginate($data['per_page'] ?? 100)
         );
     }
 
     public function commands(ListCommandResultsRequest $request, Device $device): AnonymousResourceCollection
     {
+        $data = $request->validated();
+
         $query = $device->commandResults()->orderByDesc('created_at');
 
-        if ($status = $request->input('status')) {
-            $query->where('status', $status);
+        if (($data['status'] ?? null) !== null) {
+            $query->where('status', $data['status']);
         }
 
         return CommandResultResource::collection(
-            $query->paginate($request->integer('per_page', 20))
+            $query->paginate($data['per_page'] ?? 20)
         );
     }
 }
