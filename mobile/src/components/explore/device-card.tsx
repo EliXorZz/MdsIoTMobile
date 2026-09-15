@@ -2,11 +2,16 @@ import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { POLLING_INTERVAL_MS, TELEMETRY_HISTORY_SIZE } from "@/constants/api";
+import {
+  POLLING_INTERVAL_MS,
+  TELEMETRY_HISTORY_TIME,
+  TELEMETRY_HISTORY_SIZE,
+} from "@/constants/api";
 import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useGetDeviceTelemetryQuery } from "@/store/api";
 import type { Device, Metric } from "@/types/telemetry";
+import { roundMetricValue } from "@/utils/telemetry";
 
 import { cardShadow } from "./shared-styles";
 import { TelemetryChart } from "./telemetry-chart";
@@ -21,7 +26,11 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
   const theme = useTheme();
 
   const { data: history = [] } = useGetDeviceTelemetryQuery(
-    { deviceId: device.id, perPage: TELEMETRY_HISTORY_SIZE },
+    {
+      deviceId: device.id,
+      perPage: TELEMETRY_HISTORY_SIZE,
+      bucket: TELEMETRY_HISTORY_TIME,
+    },
     { pollingInterval: POLLING_INTERVAL_MS },
   );
 
@@ -73,7 +82,7 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
         type="title"
         style={[styles.metricValue, { color: theme.tint }]}
       >
-        {value !== null ? `${value} ${metric.unit}` : "—"}
+        {value !== null ? `${roundMetricValue(value)} ${metric.unit}` : "—"}
       </ThemedText>
 
       <TelemetryChart
