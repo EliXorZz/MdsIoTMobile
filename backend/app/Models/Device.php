@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Device extends Model
 {
@@ -25,6 +26,12 @@ class Device extends Model
         'online'      => 'boolean',
         'last_seen_at' => 'immutable_datetime',
     ];
+
+    public function latestTelemetry(): HasOne
+    {
+        return $this->hasOne(Telemetry::class, 'device_id', 'device_id')
+            ->latestOfMany('observed_at');
+    }
 
     public function telemetry(): HasMany
     {
