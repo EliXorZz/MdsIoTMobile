@@ -1,0 +1,19 @@
+meta {
+  name: Show Device
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/devices/{{device_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+vars:pre-request {
+  device_id: sensor-001
+}

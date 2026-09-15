@@ -1,0 +1,21 @@
+meta {
+  name: Device Command Results
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/devices/{{device_id}}/commands
+  body: none
+  auth: none
+}
+
+params:query {
+  ~status: success
+  ~per_page: 20
+  ~page: 1
+}
+
+headers {
+  Accept: application/json
+}

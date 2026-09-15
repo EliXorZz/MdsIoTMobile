@@ -1,0 +1,26 @@
+meta {
+  name: Device Telemetry
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/devices/{{device_id}}/telemetry
+  body: none
+  auth: none
+}
+
+params:query {
+  ~from: 2025-01-01T00:00:00Z
+  ~to: 2025-12-31T23:59:59Z
+  ~per_page: 100
+  ~page: 1
+}
+
+headers {
+  Accept: application/json
+}
+
+vars:pre-request {
+  device_id: sensor-001
+}

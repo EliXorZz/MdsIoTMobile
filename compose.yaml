@@ -66,7 +66,8 @@ services:
         condition: service_started
 
   postgres:
-    image: postgres:17-alpine
+    image: timescale/timescaledb:latest-pg17
+    command: postgres -c shared_preload_libraries=timescaledb
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-iot}
       POSTGRES_USER: ${POSTGRES_USER:-root}
@@ -110,7 +111,25 @@ services:
         condition: service_healthy
       mosquitto:
         condition: service_healthy
-    restart: unless-stopped
+
+#  subscriber:
+#    build: ./backend
+#    env_file: ./backend/.env
+#    command: ["php", "artisan", "mqtt:subscribe"]
+#    environment:
+#      DB_HOST: postgres
+#      REDIS_HOST: redis
+#      MQTT_HOST: mosquitto
+#      MQTT_USER: backend
+#      MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+#    volumes:
+#      - backend-storage:/app/storage
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      mosquitto:
+#        condition: service_healthy
+#    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
