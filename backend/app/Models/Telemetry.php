@@ -35,8 +35,8 @@ class Telemetry extends Model
         return $query
             ->selectRaw(
                 "time_bucket(? * interval '1 minute', observed_at) AS observed_at,
-                 AVG(temperature)::float AS temperature,
-                 ROUND(AVG(co2))::integer AS co2",
+                 (ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY temperature)::numeric * 2) / 2.0)::float AS temperature,
+                 ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY co2))::integer AS co2",
                 [$minutes]
             )
             ->groupByRaw('1');
