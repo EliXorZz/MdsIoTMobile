@@ -6,16 +6,14 @@ use App\Http\Resources\CommandResultResource;
 use App\Http\Resources\DeviceResource;
 use App\Http\Resources\TelemetryResource;
 use App\Models\Device;
-use App\Models\Telemetry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 
 class DeviceController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Device::query();
+        $query = Device::with('latestTelemetry');
 
         if ($request->has('online')) {
             $query->where('online', filter_var($request->online, FILTER_VALIDATE_BOOLEAN));
@@ -25,22 +23,16 @@ class DeviceController extends Controller
             $query->where('room_id', $request->room_id);
         }
 
-        $devices = $query->orderBy('device_id')->paginate(50);
-
-        $this->loadLatestTelemetry($devices->items());
-
-        return DeviceResource::collection($devices);
+        return DeviceResource::collection(
+            $query->orderBy('device_id')->paginate(50)
+        );
     }
 
     public function show(Device $device): DeviceResource
     {
-        $latest = Telemetry::where('device_id', $device->device_id)
-            ->orderByDesc('observed_at')
-            ->first();
-
-        $device->setRelation('latestTelemetry', $latest);
-
-        return DeviceResource::make($device);
+        return DeviceResource::make(
+            $device->load('latestTelemetry')
+        );
     }
 
     public function telemetry(Request $request, Device $device): AnonymousResourceCollection
@@ -82,26 +74,5 @@ class DeviceController extends Controller
         return CommandResultResource::collection(
             $query->paginate($request->integer('per_page', 20))
         );
-    }
-
-    /** @param Device[] $devices */
-    private function loadLatestTelemetry(array $devices): void
-    {
-        if (empty($devices)) {
-            return;
-        }
-
-        $ids = array_map(fn ($d) => $d->device_id, $devices);
-
-        $rows = Telemetry::select(DB::raw('DISTINCT ON (device_id) *'))
-            ->whereIn('device_id', $ids)
-            ->orderBy('device_id')
-            ->orderByDesc('observed_at')
-            ->get()
-            ->keyBy('device_id');
-
-        foreach ($devices as $device) {
-            $device->setRelation('latestTelemetry', $rows->get($device->device_id));
-        }
     }
 }

@@ -7,9 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class Telemetry extends Model
 {
     protected $table = 'telemetry';
+
+    protected $primaryKey = 'message_id';
+    protected $keyType = 'string';
+
     public $timestamps = false;
     public $incrementing = false;
-    protected $primaryKey = null;
 
     protected $fillable = [
         'observed_at',
