@@ -11,7 +11,7 @@ import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useGetDeviceTelemetryQuery } from "@/store/api";
 import type { Device, Metric } from "@/types/telemetry";
-import { roundMetricValue } from "@/utils/telemetry";
+import { isTelemetryStale, roundMetricValue } from "@/utils/telemetry";
 
 import { cardShadow } from "./shared-styles";
 import { TelemetryChart } from "./telemetry-chart";
@@ -42,6 +42,9 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
   const observedAt =
     latestPoint?.observed_at ?? device.latest_telemetry?.observed_at ?? null;
   const isOnline = device.online;
+  // Un objet peut rester `online` (connecté au broker) tout en ayant arrêté sa
+  // télémétrie (mode pause) : la valeur affichée ne décrit alors plus la salle.
+  const isStale = isTelemetryStale(observedAt);
 
   return (
     <ThemedView
@@ -63,6 +66,12 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
               ? new Date(observedAt).toLocaleString()
               : "Aucune mesure"}
           </ThemedText>
+
+          {isStale && (
+            <ThemedText type="small" style={{ color: theme.warning }}>
+              ⏳ Mesure ancienne
+            </ThemedText>
+          )}
         </ThemedView>
 
         <ThemedView type="backgroundSelected" style={styles.statusPill}>

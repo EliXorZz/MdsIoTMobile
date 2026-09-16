@@ -6,12 +6,12 @@ L'application permet de récupérer des données provenant de capteurs, de les t
 
 L'architecture retenue repose sur les composants suivants :
 
-* **Mosquitto** : broker MQTT
-* **Laravel** : backend et API REST
-* **PostgreSQL** : base de données relationnelle
-* **TimescaleDB** : extension PostgreSQL dédiée aux séries temporelles
-* **React Native** : application mobile
-* **Docker** : conteneurisation des différents services
+- **Mosquitto** : broker MQTT
+- **Laravel** : backend et API REST
+- **PostgreSQL** : base de données relationnelle
+- **TimescaleDB** : extension PostgreSQL dédiée aux séries temporelles
+- **React Native** : application mobile
+- **Docker** : conteneurisation des différents services
 
 ---
 
@@ -139,12 +139,12 @@ Les capteurs sont responsables de la collecte des données physiques.
 
 Exemples :
 
-* température ;
-* humidité ;
-* pression ;
-* luminosité ;
-* qualité de l'air ;
-* consommation énergétique.
+- température ;
+- humidité ;
+- pression ;
+- luminosité ;
+- qualité de l'air ;
+- consommation énergétique.
 
 Les capteurs communiquent avec le système via le protocole **MQTT**.
 
@@ -160,11 +160,11 @@ Il constitue le point central de communication entre les capteurs et le backend.
 
 Ses responsabilités sont :
 
-* réception des messages MQTT ;
-* gestion des topics ;
-* distribution des messages aux clients abonnés ;
-* gestion des connexions MQTT ;
-* éventuellement gestion de l'authentification des clients.
+- réception des messages MQTT ;
+- gestion des topics ;
+- distribution des messages aux clients abonnés ;
+- gestion des connexions MQTT ;
+- éventuellement gestion de l'authentification des clients.
 
 Exemple :
 
@@ -343,6 +343,40 @@ flowchart TB
 
 L'application ne possède aucune connexion directe à PostgreSQL.
 
+## 7.1 Persistance et cache mobile
+
+L'application utilise **RTK Query** (Redux Toolkit) comme client HTTP et cache. Ce cache est persisté sur l'appareil via **redux-persist** + **AsyncStorage** ([`mobile/src/store/index.ts`](../mobile/src/store/index.ts)), afin que les derniers capteurs connus restent affichables après une coupure réseau ou la fermeture complète de l'application.
+
+```text
+useGetDevicesQuery()
+        │
+        ▼
+  Cache RTK Query (mémoire)
+        │  redux-persist
+        ▼
+  AsyncStorage (disque, sur l'appareil)
+```
+
+Principes retenus :
+
+- **Remplacement complet, jamais d'append.** Chaque requête réussie remplace intégralement les données en cache pour cette clé ; l'historique n'est jamais construit en cumulant des réponses côté client. Cela évite tout doublon d'historique lié au client mobile, indépendamment des garde-fous déjà en place côté backend (voir [docs/decisions/0001](decisions/0001-deduplication-telemetrie.md) et [0002](decisions/0002-ordre-chronologique-mesures.md)).
+- **Horodatage natif.** `fulfilledTimeStamp`, fourni par RTK Query, est utilisé tel quel pour afficher « Dernière mise à jour : HH:mm:ss » — aucun horodatage applicatif maison à synchroniser.
+- **Reprise automatique.** `refetchOnReconnect` et `refetchOnFocus` sont activés sur l'`api` RTK Query et câblés à `NetInfo` (connectivité) et `AppState` (premier plan/arrière-plan), car React Native n'émet pas les événements navigateur (`online`, `visibilitychange`) utilisés par défaut par RTK Query. Un retour réseau ou un retour au premier plan déclenche donc un rafraîchissement immédiat, sans attendre le prochain sondage périodique (`pollingInterval`).
+
+Détail de la décision et des alternatives écartées : [docs/decisions/0003-cache-mobile-hors-ligne.md](decisions/0003-cache-mobile-hors-ligne.md).
+
+## 7.2 Règles de fraîcheur
+
+Trois signaux distincts sont exposés séparément dans l'interface, afin de ne jamais confondre une coupure réseau du téléphone, un objet indisponible et une mesure simplement ancienne (voir [contrat-mqtt.md](contrat-mqtt.md#disponibilité-et-reconnexion) sur le mode `pause`) :
+
+| Signal                   | Origine                                                       | Affichage mobile                            |
+| ------------------------ | ------------------------------------------------------------- | ------------------------------------------- |
+| Réseau du téléphone      | `NetInfo` (`useNetworkStatus`)                                | Bandeau « 📴 Hors ligne » global            |
+| Disponibilité de l'objet | `device.online` (topic `availability` / Last Will)            | Badge « En ligne / Hors ligne » par capteur |
+| Fraîcheur de la mesure   | `latest_telemetry.observed_at` vs `STALE_TELEMETRY_MS` (30 s) | Badge « ⏳ Mesure ancienne » par capteur    |
+
+Un objet peut ainsi apparaître **en ligne avec une mesure ancienne** (mode `pause`), ce qui est volontairement distingué d'un objet réellement hors ligne ou d'un téléphone déconnecté. Détail des réponses et preuves reproductibles : [docs/J2.md](J2.md).
+
 ---
 
 # 8. Architecture Docker
@@ -376,7 +410,9 @@ flowchart TB
     MOBILE -->|HTTPS| API
     API -->|SQL| DB
 ```
+
 (Il se trouve que pour ce tp les capteurs sont simulés dans docker)
+
 ## 8.1 Services Docker
 
 Le projet pourra être organisé autour des services suivants :
@@ -487,9 +523,9 @@ Les capteurs communiquent avec Mosquitto.
 
 Selon l'environnement, Mosquitto pourra utiliser :
 
-* authentification par identifiant/mot de passe ;
-* ACL sur les topics ;
-* MQTT over TLS.
+- authentification par identifiant/mot de passe ;
+- ACL sur les topics ;
+- MQTT over TLS.
 
 ---
 
@@ -497,11 +533,11 @@ Selon l'environnement, Mosquitto pourra utiliser :
 
 | Composant        | Responsabilité                |
 | ---------------- | ----------------------------- |
-| 📡 Capteur       | Récupérer les données           |
+| 📡 Capteur       | Récupérer les données         |
 | 📨 Mosquitto     | Transporter les messages MQTT |
 | ⚙️ MQTT Consumer | Traiter les mesures           |
 | 🌐 Laravel API   | Exposer les données           |
-| 🗄️ PostgreSQL   | Stocker les données métier    |
+| 🗄️ PostgreSQL    | Stocker les données métier    |
 | 📈 TimescaleDB   | Gérer les séries temporelles  |
 | 📱 React Native  | Interface utilisateur         |
 | 🐳 Docker        | Conteneuriser les services    |
@@ -536,10 +572,10 @@ UI          → React Native
 
 L'architecture permet d'augmenter progressivement :
 
-* le nombre de capteurs ;
-* le nombre de messages MQTT ;
-* le nombre de consommateurs ;
-* le nombre d'utilisateurs mobiles.
+- le nombre de capteurs ;
+- le nombre de messages MQTT ;
+- le nombre de consommateurs ;
+- le nombre d'utilisateurs mobiles.
 
 Le consumer MQTT étant séparé de l'API, il pourra notamment être dimensionné indépendamment si le volume de données augmente.
 

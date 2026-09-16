@@ -19,6 +19,7 @@ export const Colors = {
     onTint: "#ffffff",
     success: "#1F9254",
     danger: "#D92D20",
+    warning: "#B54708",
   },
   dark: {
     text: "#ffffff",
@@ -31,6 +32,7 @@ export const Colors = {
     onTint: "#ffffff",
     success: "#3CCB7F",
     danger: "#F97066",
+    warning: "#F79009",
   },
 } as const;
 
