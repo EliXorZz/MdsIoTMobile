@@ -23,7 +23,7 @@ import {
 } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
-const API_URL = "http://10.182.28.105:8000/health";
+const API_URL = "http://10.144.81.105:8000/health";
 
 function getDevMenuHint() {
   if (Platform.OS === "web") {
@@ -66,8 +66,10 @@ export default function HomeScreen() {
         : theme.textSecondary;
 
   useEffect(() => {
+    console.log("Fetching API status...");
     fetch(API_URL)
       .then((res) => {
+        console.log("Received response:", res);
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }

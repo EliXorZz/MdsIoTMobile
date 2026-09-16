@@ -23,59 +23,98 @@ import {
   Spacing,
   WideBreakpoint,
 } from "@/constants/theme";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useTheme } from "@/hooks/use-theme";
 import { useGetDevicesQuery } from "@/store/api";
 import { AVAILABLE_METRICS, type Metric, type Room } from "@/types/telemetry";
+import { formatQueryError } from "@/utils/errors";
 
 export default function ExploreScreen() {
   const safeAreaInsets = useSafeAreaInsets();
-
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-
   const theme = useTheme();
-
   const { width } = useWindowDimensions();
+
+  const isConnected = useNetworkStatus();
+
   const isWide = width >= WideBreakpoint;
   const isExtraWide = width >= ExtraWideBreakpoint;
+
   const cardWidthPercent = isExtraWide ? "32%" : isWide ? "48%" : "100%";
 
-  // Une seule requête, mise en cache et rafraîchie au rythme des données du simulateur.
   const {
     data: devices = [],
     isLoading,
+    isFetching,
     error,
+    fulfilledTimeStamp,
     refetch,
   } = useGetDevicesQuery(undefined, {
     pollingInterval: POLLING_INTERVAL_MS,
   });
 
+  // `pollingInterval` + `refetchOnReconnect` continuent de retenter l'appel toutes les
+  // 5s même hors-ligne ; `isFetching` hors-ligne signale une tentative de reconnexion en cours.
+  const isReconnecting = !isConnected && isFetching;
+  const lastUpdatedLabel = fulfilledTimeStamp
+    ? new Date(fulfilledTimeStamp).toLocaleTimeString()
+    : null;
+
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<Metric | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const rooms: Room[] = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          devices.map((device) => [
-            device.room_id,
-            { id: device.room_id, name: device.room_id },
-          ]),
-        ).values(),
-      ),
-    [devices],
+  /**
+   * Calcule les insets utilisés pour éviter que le contenu
+   * passe sous les éléments système / la bottom tab bar.
+   */
+  const contentInsets = useMemo(
+    () => ({
+      top: safeAreaInsets.top,
+      bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+    }),
+    [safeAreaInsets.top, safeAreaInsets.bottom],
   );
 
-  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+  /**
+   * Génère la liste unique des salles présentes dans les capteurs.
+   */
+  const rooms = useMemo<Room[]>(() => {
+    const uniqueRooms = new Map<string, Room>();
 
+    for (const device of devices) {
+      if (!uniqueRooms.has(device.room_id)) {
+        uniqueRooms.set(device.room_id, {
+          id: device.room_id,
+          name: device.room_id,
+        });
+      }
+    }
+
+    return Array.from(uniqueRooms.values());
+  }, [devices]);
+
+  /**
+   * Salle actuellement sélectionnée.
+   */
+  const selectedRoom = useMemo(
+    () => rooms.find((room) => room.id === selectedRoomId) ?? null,
+    [rooms, selectedRoomId],
+  );
+
+  /**
+   * Capteurs appartenant à la salle sélectionnée.
+   */
   const roomDevices = useMemo(
-    () => devices.filter((device) => device.room_id === selectedRoomId),
+    () =>
+      selectedRoomId
+        ? devices.filter((device) => device.room_id === selectedRoomId)
+        : [],
     [devices, selectedRoomId],
   );
 
+  /**
+   * Métriques disponibles pour la salle sélectionnée.
+   */
   const availableMetrics = useMemo(
     () =>
       AVAILABLE_METRICS.filter((metric) =>
@@ -86,9 +125,35 @@ export default function ExploreScreen() {
     [roomDevices],
   );
 
-  // Sélectionne automatiquement la première métrique disponible pour la salle choisie.
+  /**
+   * Si la salle sélectionnée n'existe plus après un refresh,
+   * on revient à aucune salle.
+   */
   useEffect(() => {
-    if (!selectedMetric && availableMetrics.length > 0) {
+    if (
+      selectedRoomId !== null &&
+      !rooms.some((room) => room.id === selectedRoomId)
+    ) {
+      setSelectedRoomId(null);
+      setSelectedMetric(null);
+    }
+  }, [rooms, selectedRoomId]);
+
+  /**
+   * Si la métrique sélectionnée n'est plus disponible pour
+   * la salle actuelle, on sélectionne automatiquement la première.
+   */
+  useEffect(() => {
+    if (availableMetrics.length === 0) {
+      setSelectedMetric(null);
+      return;
+    }
+
+    const currentMetricIsAvailable =
+      selectedMetric !== null &&
+      availableMetrics.some((metric) => metric.key === selectedMetric.key);
+
+    if (!currentMetricIsAvailable) {
       setSelectedMetric(availableMetrics[0]);
     }
   }, [availableMetrics, selectedMetric]);
@@ -99,13 +164,22 @@ export default function ExploreScreen() {
   };
 
   const handleRefresh = async () => {
+    if (refreshing) {
+      return;
+    }
+
     setRefreshing(true);
+
     try {
-      await refetch();
+      await refetch().unwrap();
+    } catch {
+      // L'erreur est déjà gérée par RTK Query via `error`.
     } finally {
       setRefreshing(false);
     }
   };
+
+  const isShowingCachedData = !isConnected && devices.length > 0;
 
   return (
     <ScrollView
@@ -115,13 +189,14 @@ export default function ExploreScreen() {
           backgroundColor: theme.background,
         },
       ]}
-      contentInset={insets}
+      contentInset={contentInsets}
       contentContainerStyle={[
         styles.contentContainer,
         {
-          paddingTop: Platform.OS === "web" ? Spacing.six : insets.top,
+          paddingTop: Platform.OS === "web" ? Spacing.six : contentInsets.top,
 
-          paddingBottom: Platform.OS === "web" ? Spacing.four : insets.bottom,
+          paddingBottom:
+            Platform.OS === "web" ? Spacing.four : contentInsets.bottom,
         },
       ]}
       refreshControl={
@@ -154,21 +229,69 @@ export default function ExploreScreen() {
             Sélectionnez une salle et une métrique pour visualiser les dernières
             mesures.
           </ThemedText>
+
+          <ThemedText type="small" themeColor="textSecondary">
+            {lastUpdatedLabel
+              ? `Dernière mise à jour : ${lastUpdatedLabel}`
+              : "En attente des premières données…"}
+          </ThemedText>
         </ThemedView>
 
-        {/* ERREUR */}
-        {error && (
+        {/* HORS LIGNE */}
+        {isShowingCachedData && (
           <ThemedView
             type="backgroundElement"
-            style={[styles.errorCard, { borderColor: theme.danger }]}
+            style={[
+              styles.errorCard,
+              {
+                borderColor: theme.textSecondary,
+              },
+            ]}
+          >
+            <ThemedText type="smallBold">📴 Hors ligne</ThemedText>
+
+            <ThemedText type="small" themeColor="textSecondary">
+              Affichage des dernières données enregistrées
+              {fulfilledTimeStamp
+                ? ` (${new Date(fulfilledTimeStamp).toLocaleString()})`
+                : ""}
+              .
+            </ThemedText>
+
+            <ThemedText type="small" themeColor="textSecondary">
+              {isReconnecting
+                ? "Tentative de reconnexion…"
+                : "Nouvelle tentative automatique dès que le réseau revient."}
+            </ThemedText>
+          </ThemedView>
+        )}
+
+        {/* ERREUR */}
+        {error && !isShowingCachedData && (
+          <ThemedView
+            type="backgroundElement"
+            style={[
+              styles.errorCard,
+              {
+                borderColor: theme.danger,
+              },
+            ]}
           >
             <ThemedText type="smallBold" style={{ color: theme.danger }}>
               ⚠ Erreur
             </ThemedText>
 
             <ThemedText type="small" themeColor="textSecondary">
-              Impossible de récupérer les capteurs.
+              {isConnected
+                ? "Impossible de récupérer les capteurs."
+                : "Aucune donnée en cache disponible hors ligne."}
             </ThemedText>
+
+            {__DEV__ && (
+              <ThemedText type="code" themeColor="textSecondary">
+                {formatQueryError(error)}
+              </ThemedText>
+            )}
           </ThemedView>
         )}
 
@@ -186,7 +309,7 @@ export default function ExploreScreen() {
           />
         </ThemedView>
 
-        {/* METRICS */}
+        {/* METRIQUES */}
         {selectedRoom && (
           <ThemedView style={styles.section}>
             <ThemedText type="subtitle" style={styles.sectionTitle}>
@@ -202,12 +325,17 @@ export default function ExploreScreen() {
           </ThemedView>
         )}
 
-        {/* DONNÉES */}
+        {/* DONNEES */}
         {selectedRoom && selectedMetric && (
           <ThemedView style={styles.section}>
             <ThemedView
               type="backgroundElement"
-              style={[styles.measurementHeader, { borderColor: theme.border }]}
+              style={[
+                styles.measurementHeader,
+                {
+                  borderColor: theme.border,
+                },
+              ]}
             >
               <ThemedView>
                 <ThemedText type="subtitle">{selectedMetric.name}</ThemedText>

@@ -1,4 +1,4 @@
-export const API_URL = "http://10.182.28.105:8000/api";
+export const API_URL = "http://10.144.81.105:8000/api";
 
 /** The simulator emits new telemetry roughly every 5 seconds. */
 export const POLLING_INTERVAL_MS = 5000;
