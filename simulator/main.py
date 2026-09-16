@@ -139,11 +139,13 @@ class Sensor:
 
 
 def main():
+    import sys
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
     interval = float(os.getenv('PUBLISH_INTERVAL', '2'))
     if not math.isfinite(interval) or interval < .1:
         raise ValueError('PUBLISH_INTERVAL doit être au moins 0.1 seconde')
-    with open('devices.json', encoding='utf-8') as f:
+    devices_file = sys.argv[1] if len(sys.argv) > 1 else 'devices.json'
+    with open(devices_file, encoding='utf-8') as f:
         entries = json.load(f)
     if not isinstance(entries, list) or not entries or len(entries) > 100:
         raise ValueError('devices.json : entre 1 et 100 objets')

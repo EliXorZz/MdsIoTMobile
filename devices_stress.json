@@ -1,0 +1,502 @@
+[
+  {
+    "device_id": "sensor-001",
+    "room_id": "salle-201",
+    "label": "Salle 201"
+  },
+  {
+    "device_id": "sensor-002",
+    "room_id": "salle-202",
+    "label": "Salle 202"
+  },
+  {
+    "device_id": "sensor-003",
+    "room_id": "salle-203",
+    "label": "Salle 203"
+  },
+  {
+    "device_id": "sensor-004",
+    "room_id": "salle-204",
+    "label": "Salle 204"
+  },
+  {
+    "device_id": "sensor-005",
+    "room_id": "salle-205",
+    "label": "Salle 205"
+  },
+  {
+    "device_id": "sensor-006",
+    "room_id": "salle-206",
+    "label": "Salle 206"
+  },
+  {
+    "device_id": "sensor-007",
+    "room_id": "salle-207",
+    "label": "Salle 207"
+  },
+  {
+    "device_id": "sensor-008",
+    "room_id": "salle-208",
+    "label": "Salle 208"
+  },
+  {
+    "device_id": "sensor-009",
+    "room_id": "salle-209",
+    "label": "Salle 209"
+  },
+  {
+    "device_id": "sensor-010",
+    "room_id": "salle-210",
+    "label": "Salle 210"
+  },
+  {
+    "device_id": "sensor-011",
+    "room_id": "salle-211",
+    "label": "Salle 211"
+  },
+  {
+    "device_id": "sensor-012",
+    "room_id": "salle-212",
+    "label": "Salle 212"
+  },
+  {
+    "device_id": "sensor-013",
+    "room_id": "salle-213",
+    "label": "Salle 213"
+  },
+  {
+    "device_id": "sensor-014",
+    "room_id": "salle-214",
+    "label": "Salle 214"
+  },
+  {
+    "device_id": "sensor-015",
+    "room_id": "salle-215",
+    "label": "Salle 215"
+  },
+  {
+    "device_id": "sensor-016",
+    "room_id": "salle-216",
+    "label": "Salle 216"
+  },
+  {
+    "device_id": "sensor-017",
+    "room_id": "salle-217",
+    "label": "Salle 217"
+  },
+  {
+    "device_id": "sensor-018",
+    "room_id": "salle-218",
+    "label": "Salle 218"
+  },
+  {
+    "device_id": "sensor-019",
+    "room_id": "salle-219",
+    "label": "Salle 219"
+  },
+  {
+    "device_id": "sensor-020",
+    "room_id": "salle-220",
+    "label": "Salle 220"
+  },
+  {
+    "device_id": "sensor-021",
+    "room_id": "salle-221",
+    "label": "Salle 221"
+  },
+  {
+    "device_id": "sensor-022",
+    "room_id": "salle-222",
+    "label": "Salle 222"
+  },
+  {
+    "device_id": "sensor-023",
+    "room_id": "salle-223",
+    "label": "Salle 223"
+  },
+  {
+    "device_id": "sensor-024",
+    "room_id": "salle-224",
+    "label": "Salle 224"
+  },
+  {
+    "device_id": "sensor-025",
+    "room_id": "salle-225",
+    "label": "Salle 225"
+  },
+  {
+    "device_id": "sensor-026",
+    "room_id": "salle-226",
+    "label": "Salle 226"
+  },
+  {
+    "device_id": "sensor-027",
+    "room_id": "salle-227",
+    "label": "Salle 227"
+  },
+  {
+    "device_id": "sensor-028",
+    "room_id": "salle-228",
+    "label": "Salle 228"
+  },
+  {
+    "device_id": "sensor-029",
+    "room_id": "salle-229",
+    "label": "Salle 229"
+  },
+  {
+    "device_id": "sensor-030",
+    "room_id": "salle-230",
+    "label": "Salle 230"
+  },
+  {
+    "device_id": "sensor-031",
+    "room_id": "salle-231",
+    "label": "Salle 231"
+  },
+  {
+    "device_id": "sensor-032",
+    "room_id": "salle-232",
+    "label": "Salle 232"
+  },
+  {
+    "device_id": "sensor-033",
+    "room_id": "salle-233",
+    "label": "Salle 233"
+  },
+  {
+    "device_id": "sensor-034",
+    "room_id": "salle-234",
+    "label": "Salle 234"
+  },
+  {
+    "device_id": "sensor-035",
+    "room_id": "salle-235",
+    "label": "Salle 235"
+  },
+  {
+    "device_id": "sensor-036",
+    "room_id": "salle-236",
+    "label": "Salle 236"
+  },
+  {
+    "device_id": "sensor-037",
+    "room_id": "salle-237",
+    "label": "Salle 237"
+  },
+  {
+    "device_id": "sensor-038",
+    "room_id": "salle-238",
+    "label": "Salle 238"
+  },
+  {
+    "device_id": "sensor-039",
+    "room_id": "salle-239",
+    "label": "Salle 239"
+  },
+  {
+    "device_id": "sensor-040",
+    "room_id": "salle-240",
+    "label": "Salle 240"
+  },
+  {
+    "device_id": "sensor-041",
+    "room_id": "salle-241",
+    "label": "Salle 241"
+  },
+  {
+    "device_id": "sensor-042",
+    "room_id": "salle-242",
+    "label": "Salle 242"
+  },
+  {
+    "device_id": "sensor-043",
+    "room_id": "salle-243",
+    "label": "Salle 243"
+  },
+  {
+    "device_id": "sensor-044",
+    "room_id": "salle-244",
+    "label": "Salle 244"
+  },
+  {
+    "device_id": "sensor-045",
+    "room_id": "salle-245",
+    "label": "Salle 245"
+  },
+  {
+    "device_id": "sensor-046",
+    "room_id": "salle-246",
+    "label": "Salle 246"
+  },
+  {
+    "device_id": "sensor-047",
+    "room_id": "salle-247",
+    "label": "Salle 247"
+  },
+  {
+    "device_id": "sensor-048",
+    "room_id": "salle-248",
+    "label": "Salle 248"
+  },
+  {
+    "device_id": "sensor-049",
+    "room_id": "salle-249",
+    "label": "Salle 249"
+  },
+  {
+    "device_id": "sensor-050",
+    "room_id": "salle-250",
+    "label": "Salle 250"
+  },
+  {
+    "device_id": "sensor-051",
+    "room_id": "salle-251",
+    "label": "Salle 251"
+  },
+  {
+    "device_id": "sensor-052",
+    "room_id": "salle-252",
+    "label": "Salle 252"
+  },
+  {
+    "device_id": "sensor-053",
+    "room_id": "salle-253",
+    "label": "Salle 253"
+  },
+  {
+    "device_id": "sensor-054",
+    "room_id": "salle-254",
+    "label": "Salle 254"
+  },
+  {
+    "device_id": "sensor-055",
+    "room_id": "salle-255",
+    "label": "Salle 255"
+  },
+  {
+    "device_id": "sensor-056",
+    "room_id": "salle-256",
+    "label": "Salle 256"
+  },
+  {
+    "device_id": "sensor-057",
+    "room_id": "salle-257",
+    "label": "Salle 257"
+  },
+  {
+    "device_id": "sensor-058",
+    "room_id": "salle-258",
+    "label": "Salle 258"
+  },
+  {
+    "device_id": "sensor-059",
+    "room_id": "salle-259",
+    "label": "Salle 259"
+  },
+  {
+    "device_id": "sensor-060",
+    "room_id": "salle-260",
+    "label": "Salle 260"
+  },
+  {
+    "device_id": "sensor-061",
+    "room_id": "salle-261",
+    "label": "Salle 261"
+  },
+  {
+    "device_id": "sensor-062",
+    "room_id": "salle-262",
+    "label": "Salle 262"
+  },
+  {
+    "device_id": "sensor-063",
+    "room_id": "salle-263",
+    "label": "Salle 263"
+  },
+  {
+    "device_id": "sensor-064",
+    "room_id": "salle-264",
+    "label": "Salle 264"
+  },
+  {
+    "device_id": "sensor-065",
+    "room_id": "salle-265",
+    "label": "Salle 265"
+  },
+  {
+    "device_id": "sensor-066",
+    "room_id": "salle-266",
+    "label": "Salle 266"
+  },
+  {
+    "device_id": "sensor-067",
+    "room_id": "salle-267",
+    "label": "Salle 267"
+  },
+  {
+    "device_id": "sensor-068",
+    "room_id": "salle-268",
+    "label": "Salle 268"
+  },
+  {
+    "device_id": "sensor-069",
+    "room_id": "salle-269",
+    "label": "Salle 269"
+  },
+  {
+    "device_id": "sensor-070",
+    "room_id": "salle-270",
+    "label": "Salle 270"
+  },
+  {
+    "device_id": "sensor-071",
+    "room_id": "salle-271",
+    "label": "Salle 271"
+  },
+  {
+    "device_id": "sensor-072",
+    "room_id": "salle-272",
+    "label": "Salle 272"
+  },
+  {
+    "device_id": "sensor-073",
+    "room_id": "salle-273",
+    "label": "Salle 273"
+  },
+  {
+    "device_id": "sensor-074",
+    "room_id": "salle-274",
+    "label": "Salle 274"
+  },
+  {
+    "device_id": "sensor-075",
+    "room_id": "salle-275",
+    "label": "Salle 275"
+  },
+  {
+    "device_id": "sensor-076",
+    "room_id": "salle-276",
+    "label": "Salle 276"
+  },
+  {
+    "device_id": "sensor-077",
+    "room_id": "salle-277",
+    "label": "Salle 277"
+  },
+  {
+    "device_id": "sensor-078",
+    "room_id": "salle-278",
+    "label": "Salle 278"
+  },
+  {
+    "device_id": "sensor-079",
+    "room_id": "salle-279",
+    "label": "Salle 279"
+  },
+  {
+    "device_id": "sensor-080",
+    "room_id": "salle-280",
+    "label": "Salle 280"
+  },
+  {
+    "device_id": "sensor-081",
+    "room_id": "salle-281",
+    "label": "Salle 281"
+  },
+  {
+    "device_id": "sensor-082",
+    "room_id": "salle-282",
+    "label": "Salle 282"
+  },
+  {
+    "device_id": "sensor-083",
+    "room_id": "salle-283",
+    "label": "Salle 283"
+  },
+  {
+    "device_id": "sensor-084",
+    "room_id": "salle-284",
+    "label": "Salle 284"
+  },
+  {
+    "device_id": "sensor-085",
+    "room_id": "salle-285",
+    "label": "Salle 285"
+  },
+  {
+    "device_id": "sensor-086",
+    "room_id": "salle-286",
+    "label": "Salle 286"
+  },
+  {
+    "device_id": "sensor-087",
+    "room_id": "salle-287",
+    "label": "Salle 287"
+  },
+  {
+    "device_id": "sensor-088",
+    "room_id": "salle-288",
+    "label": "Salle 288"
+  },
+  {
+    "device_id": "sensor-089",
+    "room_id": "salle-289",
+    "label": "Salle 289"
+  },
+  {
+    "device_id": "sensor-090",
+    "room_id": "salle-290",
+    "label": "Salle 290"
+  },
+  {
+    "device_id": "sensor-091",
+    "room_id": "salle-291",
+    "label": "Salle 291"
+  },
+  {
+    "device_id": "sensor-092",
+    "room_id": "salle-292",
+    "label": "Salle 292"
+  },
+  {
+    "device_id": "sensor-093",
+    "room_id": "salle-293",
+    "label": "Salle 293"
+  },
+  {
+    "device_id": "sensor-094",
+    "room_id": "salle-294",
+    "label": "Salle 294"
+  },
+  {
+    "device_id": "sensor-095",
+    "room_id": "salle-295",
+    "label": "Salle 295"
+  },
+  {
+    "device_id": "sensor-096",
+    "room_id": "salle-296",
+    "label": "Salle 296"
+  },
+  {
+    "device_id": "sensor-097",
+    "room_id": "salle-297",
+    "label": "Salle 297"
+  },
+  {
+    "device_id": "sensor-098",
+    "room_id": "salle-298",
+    "label": "Salle 298"
+  },
+  {
+    "device_id": "sensor-099",
+    "room_id": "salle-299",
+    "label": "Salle 299"
+  },
+  {
+    "device_id": "sensor-100",
+    "room_id": "salle-300",
+    "label": "Salle 300"
+  }
+]

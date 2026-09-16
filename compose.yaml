@@ -66,8 +66,7 @@ services:
         condition: service_started
 
   postgres:
-    image: timescale/timescaledb:latest-pg17
-    command: postgres -c shared_preload_libraries=timescaledb
+    image: timescale/timescaledb-ha:pg17-all-arm64
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-iot}
       POSTGRES_USER: ${POSTGRES_USER:-root}
@@ -90,7 +89,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6378"
+      - "127.0.0.1:${REDIS_PORT:-6378}:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -101,6 +100,7 @@ services:
     environment:
       DB_HOST: postgres
       REDIS_HOST: redis
+      REDIS_PORT: 6379
       MQTT_HOST: mosquitto
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
@@ -119,9 +119,12 @@ services:
     environment:
       DB_HOST: postgres
       REDIS_HOST: redis
+      REDIS_PORT: 6379
       MQTT_HOST: mosquitto
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+      MQTT_ENABLE_LOGGING: "false"
+      LOG_LEVEL: error
     volumes:
       - backend-storage:/app/storage
     depends_on:

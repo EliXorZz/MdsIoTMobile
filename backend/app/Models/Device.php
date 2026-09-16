@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Device extends Model
 {
     protected $primaryKey = 'device_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -23,21 +25,20 @@ class Device extends Model
 
     protected $casts = [
         'ventilation' => 'boolean',
-        'online'      => 'boolean',
+        'online' => 'boolean',
         'last_seen_at' => 'immutable_datetime',
     ];
 
     public function latestTelemetry(): HasOne
     {
-        return $this->hasOne(Telemetry::class, 'device_id', 'device_id')
-            ->latestOfMany('observed_at');
+        return $this->hasOne(TelemetryOneMinute::class, 'device_id', 'device_id')
+            ->ofMany(['bucket' => 'MAX']);
     }
 
     public function telemetry(): HasMany
     {
         return $this->hasMany(Telemetry::class, 'device_id', 'device_id');
     }
-
 
     public function commandResults(): HasMany
     {

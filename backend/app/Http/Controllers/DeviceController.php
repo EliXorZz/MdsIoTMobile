@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TelemetryResolution;
 use App\Http\Requests\ListCommandResultsRequest;
 use App\Http\Requests\ListDevicesRequest;
 use App\Http\Requests\ListTelemetryRequest;
 use App\Http\Resources\CommandResultResource;
 use App\Http\Resources\DeviceResource;
-use App\Http\Resources\TelemetryResource;
+use App\Http\Resources\TelemetryAggregateResource;
 use App\Models\Device;
-use App\Models\Telemetry;
+use App\Models\TelemetryAggregate;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DeviceController extends Controller
@@ -43,24 +44,21 @@ class DeviceController extends Controller
     public function telemetry(ListTelemetryRequest $request, Device $device): AnonymousResourceCollection
     {
         $data = $request->validated();
+        $resolution = TelemetryResolution::forRange($data['from'] ?? null, $data['to'] ?? null);
 
-        $bucket = $data['bucket'] ?? null;
+        $query = TelemetryAggregate::resolution($resolution)
+            ->where('device_id', $device->device_id)
+            ->orderBy('bucket');
 
-        $query = $bucket
-            ? $device->telemetry()->bucketed($bucket)->orderByRaw('1 DESC')
-            : $device->telemetry()->orderByDesc('observed_at');
-
-        if (($data['from'] ?? null) !== null) {
-            $query->where('observed_at', '>=', $data['from']);
+        if ($data['from'] ?? null) {
+            $query->where('bucket', '>=', $data['from']);
         }
 
-        if (($data['to'] ?? null) !== null) {
-            $query->where('observed_at', '<=', $data['to']);
+        if ($data['to'] ?? null) {
+            $query->where('bucket', '<=', $data['to']);
         }
 
-        return TelemetryResource::collection(
-            $query->paginate($data['per_page'] ?? 100)
-        );
+        return TelemetryAggregateResource::collection($query->get());
     }
 
     public function commands(ListCommandResultsRequest $request, Device $device): AnonymousResourceCollection
