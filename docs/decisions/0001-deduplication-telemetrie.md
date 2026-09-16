@@ -6,7 +6,7 @@ Le contrat MQTT du kit indique que la QoS 1 peut livrer des doublons, et que l'i
 
 ## Décision
 
-Le `message_id` du contrat MQTT est utilisé comme **clé primaire** de la table `telemetry`, et l'insertion se fait avec `insertOrIgnore` ([`StoreTelemetry`](../../backend/app/Listeners/StoreTelemetry.php)). Un message rejoué avec le même `message_id` est silencieusement ignoré par la base de données elle-même, sans logique applicative supplémentaire à maintenir.
+Le `message_id` du contrat MQTT est utilisé comme **clé primaire** de la table `telemetry`, et l'insertion se fait avec `insertOrIgnore` dans [`StoreTelemetryBatch`](../../backend/app/Listeners/StoreTelemetryBatch.php) (listener de l'événement `TelemetryBatchReceived`, lui-même déclenché par `TelemetryIngestionService` qui regroupe les mesures par lots de 500 ou toutes les 200 ms). Un message rejoué avec le même `message_id` est silencieusement ignoré par la base de données elle-même, sans logique applicative supplémentaire à maintenir.
 
 ## Alternatives envisagées
 

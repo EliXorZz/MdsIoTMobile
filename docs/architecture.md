@@ -203,28 +203,28 @@ Le consumer écoute les messages provenant de Mosquitto.
 
 Ses responsabilités sont :
 
-1. récupérer le message MQTT ;
-2. décoder le JSON ;
-3. vérifier les données ;
-4. identifier le capteur ;
-5. transformer les données si nécessaire ;
-6. enregistrer la mesure dans TimescaleDB.
+1. recevoir le message MQTT ;
+2. désérialiser et valider le JSON via `TelemetryData` (Spatie Laravel Data) ;
+3. accumuler les mesures valides dans `TelemetryIngestionService` (buffer en mémoire) ;
+4. rejeter silencieusement les messages malformés (compteur `rejected`) ;
+5. vider le buffer par lots (`TelemetryBatchReceived`) dès que 500 mesures sont en attente ou toutes les 200 ms ;
+6. persister le lot en une seule requête `insertOrIgnore` + `upsert` via `StoreTelemetryBatch`.
 
 ```text
 MQTT Message
      ↓
-JSON Decode
+Désérialisation / Validation (TelemetryData)
      ↓
-Validation
+TelemetryIngestionService (buffer)
+     ↓  500 items ou 200 ms
+TelemetryBatchReceived (event)
      ↓
-Transformation
-     ↓
-Persistence
-     ↓
-TimescaleDB
+StoreTelemetryBatch (listener)
+     ├── Telemetry::insertOrIgnore(lot)   → table brute telemetry
+     └── Device::upsert(last_seen_at)     → table devices
 ```
 
-Le consumer doit idéalement fonctionner comme un processus séparé de l'API HTTP.
+Le consumer fonctionne comme un processus séparé de l'API HTTP (`php artisan mqtt:subscribe`).
 
 ---
 
@@ -232,33 +232,42 @@ Le consumer doit idéalement fonctionner comme un processus séparé de l'API HT
 
 Laravel fournit une API REST destinée à l'application React Native.
 
-Exemples d'endpoints :
+Endpoints disponibles :
 
 ```text
 POST   /api/login
 POST   /api/logout
 
-GET    /api/sensors
-GET    /api/sensors/{id}
+GET    /api/devices              ?online=&room_id=
+GET    /api/devices/{id}
 
-GET    /api/sensors/{id}/measurements
-GET    /api/sensors/{id}/measurements/latest
-
-GET    /api/sensors/{id}/statistics
+GET    /api/devices/{id}/telemetry   ?from=&to=
+GET    /api/devices/{id}/commands
 ```
 
-Les réponses sont retournées au format JSON.
+La résolution des données de télémétrie est choisie automatiquement en fonction de la plage demandée (`from`/`to`) :
 
-Exemple :
+| Plage          | Vue utilisée     | Granularité |
+| -------------- | ---------------- | ----------- |
+| ≤ 12 heures    | `telemetry_1m`   | 1 minute    |
+| ≤ 2 jours      | `telemetry_5m`   | 5 minutes   |
+| ≤ 7 jours      | `telemetry_1h`   | 1 heure     |
+| > 7 jours      | `telemetry_1d`   | 1 jour      |
+
+Exemple de réponse `/api/devices/{id}/telemetry` :
 
 ```json
 {
-  "sensor_id": "sensor-001",
-  "measurements": [
+  "data": [
     {
-      "timestamp": "2026-09-15T08:30:00Z",
+      "bucket": "2026-09-16T12:00:00+00:00",
       "temperature": 21.4,
-      "humidity": 56.2
+      "min_temperature": 20.9,
+      "max_temperature": 21.8,
+      "co2": 820,
+      "min_co2": 800,
+      "max_co2": 850,
+      "samples": 12
     }
   ]
 }
@@ -286,27 +295,28 @@ sensor_user
 
 ## 6.2 Données temporelles
 
-Les mesures sont stockées dans une table dédiée :
+Les mesures brutes sont stockées dans une hypertable TimescaleDB :
 
 ```text
-measurements
+telemetry (hypertable, partitionnée par observed_at)
+├── observed_at  timestamptz   — horodatage métier du capteur
+├── device_id    string
+├── room_id      string
+├── message_id   string (PK)   — déduplication native
+├── temperature  float
+└── co2          integer
 ```
 
-Exemple de structure :
+Quatre vues continues (`MATERIALIZED VIEW ... WITH timescaledb.continuous`) agrègent les données brutes par intervalles de temps, avec `materialized_only = false` (real-time aggregation : les buckets non encore matérialisés sont calculés à la volée) :
 
 ```text
-measurements
-├── id
-├── sensor_id
-├── time
-├── temperature
-├── humidity
-└── ...
+telemetry_1m  ← telemetry (raw)   bucket 1 min  — latest sensor value + plages ≤ 12h
+telemetry_5m  ← telemetry (raw)   bucket 5 min  — plages ≤ 2 jours
+telemetry_1h  ← telemetry_5m      bucket 1 h    — plages ≤ 7 jours  (hierarchical)
+telemetry_1d  ← telemetry_1h      bucket 1 jour — plages > 7 jours  (hierarchical)
 ```
 
-La colonne `time` permet à TimescaleDB de gérer efficacement les séries temporelles.
-
-La table `measurements` sera configurée comme une **hypertable TimescaleDB**.
+Chaque vue expose pour chaque bucket/device : `median_temperature`, `min_temperature` (p5), `max_temperature` (p95), `median_co2`, `min_co2` (p5), `max_co2` (p95), `samples`. Les p5/p95 remplacent le min/max brut pour ignorer les spikes capteur.
 
 ---
 
