@@ -20,7 +20,9 @@ class DeviceResource extends JsonResource
             'last_seen_at' => $this->last_seen_at?->toIso8601String(),
             'created_at'   => $this->created_at->toIso8601String(),
             'updated_at'   => $this->updated_at->toIso8601String(),
-            'latest_telemetry' => TelemetryResource::make($this->whenLoaded('latestTelemetry')),
+            'latest_telemetry' => $this->whenLoaded('latestTelemetry', function () {
+                return $this->latestTelemetry ? TelemetryResource::make($this->latestTelemetry) : null;
+            }),
         ];
     }
 }

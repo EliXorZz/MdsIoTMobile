@@ -65,6 +65,25 @@ services:
       simulator:
         condition: service_started
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_PASSWORD: ""
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_PORT:-8123}:8123"
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
   postgres:
     image: timescale/timescaledb:latest-pg17
     command: postgres -c shared_preload_libraries=timescaledb
@@ -104,10 +123,13 @@ services:
       MQTT_HOST: mosquitto
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+      CLICKHOUSE_HOST: clickhouse
     volumes:
       - backend-storage:/app/storage
     depends_on:
       postgres:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
       mosquitto:
         condition: service_healthy
@@ -122,10 +144,13 @@ services:
       MQTT_HOST: mosquitto
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+      CLICKHOUSE_HOST: clickhouse
     volumes:
       - backend-storage:/app/storage
     depends_on:
       postgres:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
       mosquitto:
         condition: service_healthy
@@ -145,5 +170,6 @@ services:
 volumes:
   broker-data:
   postgres-data:
+  clickhouse-data:
   redis-data:
   backend-storage:

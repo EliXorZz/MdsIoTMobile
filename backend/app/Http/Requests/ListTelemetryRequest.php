@@ -12,7 +12,8 @@ class ListTelemetryRequest extends FormRequest
             'from'     => ['nullable', 'date'],
             'to'       => ['nullable', 'date', 'after_or_equal:from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
-            'bucket'   => ['nullable', 'integer', 'min:1', 'max:1440'],
+            'page'     => ['nullable', 'integer', 'min:1'],
+            'bucket'   => ['nullable', 'string', 'in:1m,5m,30m,1h,1d'],
         ];
     }
 }
