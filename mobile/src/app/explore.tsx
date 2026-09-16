@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DeviceDetailModal } from "@/components/explore/device-detail-modal";
 import { DeviceList } from "@/components/explore/device-list";
 import { MetricSelector } from "@/components/explore/metric-selector";
 import { RoomSelector } from "@/components/explore/room-selector";
@@ -26,7 +27,7 @@ import {
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useTheme } from "@/hooks/use-theme";
 import { useGetDevicesQuery } from "@/store/api";
-import { AVAILABLE_METRICS, type Metric, type Room } from "@/types/telemetry";
+import { AVAILABLE_METRICS, type Device, type Metric, type Room } from "@/types/telemetry";
 import { formatQueryError } from "@/utils/errors";
 
 export default function ExploreScreen() {
@@ -61,6 +62,7 @@ export default function ExploreScreen() {
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<Metric | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   /**
@@ -182,6 +184,7 @@ export default function ExploreScreen() {
   const isShowingCachedData = !isConnected && devices.length > 0;
 
   return (
+    <>
     <ScrollView
       style={[
         styles.scrollView,
@@ -352,6 +355,7 @@ export default function ExploreScreen() {
               metric={selectedMetric}
               loading={isLoading}
               cardWidthPercent={cardWidthPercent}
+              onPressDevice={setSelectedDevice}
             />
           </ThemedView>
         )}
@@ -359,6 +363,12 @@ export default function ExploreScreen() {
         {Platform.OS === "web" && <WebBadge />}
       </ThemedView>
     </ScrollView>
+
+    <DeviceDetailModal
+      device={selectedDevice}
+      onClose={() => setSelectedDevice(null)}
+    />
+    </>
   );
 }
 

@@ -23,7 +23,7 @@ import {
 } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
-const API_URL = "http://10.144.81.105:8000/health";
+const API_URL = "http://localhost:8002/health";
 
 function getDevMenuHint() {
   if (Platform.OS === "web") {

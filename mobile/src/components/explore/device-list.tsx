@@ -13,6 +13,7 @@ type Props = {
   metric: Metric;
   loading: boolean;
   cardWidthPercent: `${number}%`;
+  onPressDevice?: (device: Device) => void;
 };
 
 export function DeviceList({
@@ -20,6 +21,7 @@ export function DeviceList({
   metric,
   loading,
   cardWidthPercent,
+  onPressDevice,
 }: Props) {
   const theme = useTheme();
 
@@ -52,6 +54,7 @@ export function DeviceList({
           device={device}
           metric={metric}
           widthPercent={cardWidthPercent}
+          onPress={() => onPressDevice?.(device)}
         />
       ))}
     </View>

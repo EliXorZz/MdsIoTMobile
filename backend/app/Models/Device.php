@@ -31,8 +31,8 @@ class Device extends Model
 
     public function latestTelemetry(): HasOne
     {
-        return $this->hasOne(TelemetryOneMinute::class, 'device_id', 'device_id')
-            ->ofMany(['bucket' => 'MAX']);
+        return $this->hasOne(Telemetry::class, 'device_id', 'device_id')
+            ->ofMany(['observed_at' => 'MAX']);
     }
 
     public function telemetry(): HasMany

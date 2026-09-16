@@ -1,17 +1,13 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import {
-  POLLING_INTERVAL_MS,
-  TELEMETRY_HISTORY_TIME,
-  TELEMETRY_HISTORY_SIZE,
-} from "@/constants/api";
+import { POLLING_INTERVAL_MS } from "@/constants/api";
 import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useGetDeviceTelemetryQuery } from "@/store/api";
 import type { Device, Metric } from "@/types/telemetry";
-import { isTelemetryStale, roundMetricValue } from "@/utils/telemetry";
+import { roundMetricValue } from "@/utils/telemetry";
 
 import { cardShadow } from "./shared-styles";
 import { TelemetryChart } from "./telemetry-chart";
@@ -20,39 +16,34 @@ type Props = {
   device: Device;
   metric: Metric;
   widthPercent: `${number}%`;
+  onPress?: () => void;
 };
 
-export function DeviceCard({ device, metric, widthPercent }: Props) {
+export function DeviceCard({ device, metric, widthPercent, onPress }: Props) {
   const theme = useTheme();
 
   const { data: history = [] } = useGetDeviceTelemetryQuery(
-    {
-      deviceId: device.id,
-      perPage: TELEMETRY_HISTORY_SIZE,
-      bucket: TELEMETRY_HISTORY_TIME,
-    },
+    { deviceId: device.id },
     { pollingInterval: POLLING_INTERVAL_MS },
   );
 
-  // Dérivées du même historique que le graphique pour rester synchronisées avec le dernier point tracé.
   const latestPoint = history[history.length - 1] ?? null;
   const value = latestPoint
     ? (latestPoint[metric.key] ?? null)
     : (device.latest_telemetry?.[metric.key] ?? null);
-  const observedAt =
-    latestPoint?.observed_at ?? device.latest_telemetry?.observed_at ?? null;
+  const bucket =
+    latestPoint?.bucket ?? device.latest_telemetry?.bucket ?? null;
   const isOnline = device.online;
-  // Un objet peut rester `online` (connecté au broker) tout en ayant arrêté sa
-  // télémétrie (mode pause) : la valeur affichée ne décrit alors plus la salle.
-  const isStale = isTelemetryStale(observedAt);
+  const isStale = device.is_stale;
 
   return (
+    <Pressable onPress={onPress} style={{ width: widthPercent }}>
     <ThemedView
       type="backgroundElement"
       style={[
         styles.card,
         cardShadow,
-        { borderColor: theme.border, width: widthPercent },
+        { borderColor: theme.border },
       ]}
     >
       <ThemedView style={styles.header}>
@@ -62,9 +53,7 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
           </ThemedText>
 
           <ThemedText type="small" themeColor="textSecondary">
-            {observedAt
-              ? new Date(observedAt).toLocaleString()
-              : "Aucune mesure"}
+            {bucket ? new Date(bucket).toLocaleString() : "Aucune mesure"}
           </ThemedText>
 
           {isStale && (
@@ -108,6 +97,7 @@ export function DeviceCard({ device, metric, widthPercent }: Props) {
         </ThemedText>
       </ThemedView>
     </ThemedView>
+    </Pressable>
   );
 }
 
@@ -117,6 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.large,
     borderWidth: 1,
     gap: Spacing.three,
+    width: "100%",
   },
 
   header: {

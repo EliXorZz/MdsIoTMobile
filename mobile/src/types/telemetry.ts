@@ -1,13 +1,19 @@
 export type LatestTelemetry = {
-  observed_at: string;
+  bucket: string;
   temperature?: number;
+  min_temperature?: number;
+  max_temperature?: number;
   co2?: number;
+  min_co2?: number;
+  max_co2?: number;
+  samples?: number;
 };
 
 export type Device = {
   id: string;
   room_id: string;
   online: boolean;
+  is_stale: boolean;
   ventilation: boolean;
   boot_id: string;
   last_seen_at: string;
@@ -21,9 +27,14 @@ export type DevicesResponse = {
 };
 
 export type TelemetryPoint = {
-  observed_at: string;
+  bucket: string;
   temperature?: number;
+  min_temperature?: number;
+  max_temperature?: number;
   co2?: number;
+  min_co2?: number;
+  max_co2?: number;
+  samples?: number;
 };
 
 export type TelemetryResponse = {

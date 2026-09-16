@@ -8,9 +8,9 @@ export function roundMetricValue(value: number) {
 // La disponibilité réseau d'un objet et la fraîcheur de sa dernière mesure sont deux
 // informations distinctes (un objet en pause reste `online` sans émettre de télémétrie).
 export function isTelemetryStale(
-  observedAt: string | null,
+  bucket: string | null,
   now: number = Date.now(),
 ) {
-  if (!observedAt) return false;
-  return now - new Date(observedAt).getTime() > STALE_TELEMETRY_MS;
+  if (!bucket) return false;
+  return now - new Date(bucket).getTime() > STALE_TELEMETRY_MS;
 }

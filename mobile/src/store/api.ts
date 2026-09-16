@@ -101,15 +101,15 @@ export const api = createApi({
       TelemetryPoint[],
       {
         deviceId: string;
-        perPage?: number;
-        bucket?: number;
+        from?: string;
+        to?: string;
       }
     >({
-      query: ({ deviceId, perPage = 30, bucket = 5 }) => ({
+      query: ({ deviceId, from, to }) => ({
         url: `/devices/${deviceId}/telemetry`,
         params: {
-          per_page: perPage,
-          bucket,
+          ...(from && { from }),
+          ...(to && { to }),
         },
       }),
 
@@ -117,7 +117,7 @@ export const api = createApi({
         console.log("🔄 [TRANSFORM TELEMETRY]");
         console.log("Raw response:", response);
 
-        return [...response.data].reverse();
+        return response.data;
       },
 
       providesTags: (_result, _error, { deviceId }) => [

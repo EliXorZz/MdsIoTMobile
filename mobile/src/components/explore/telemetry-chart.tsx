@@ -23,8 +23,8 @@ function formatValue(value: number, unit: string) {
   return `${roundMetricValue(value)}${unit}`;
 }
 
-function formatTime(observedAt: string) {
-  return new Date(observedAt).toLocaleTimeString([], {
+function formatTime(bucket: string) {
+  return new Date(bucket).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -47,10 +47,10 @@ export function TelemetryChart({
   const series = points
     .map((point) => ({
       value: point[metricKey],
-      observedAt: point.observed_at,
+      bucket: point.bucket,
     }))
     .filter(
-      (entry): entry is { value: number; observedAt: string } =>
+      (entry): entry is { value: number; bucket: string } =>
         entry.value !== undefined && entry.value !== null,
     );
 
@@ -146,10 +146,10 @@ export function TelemetryChart({
 
       <View style={[styles.xAxis, { paddingLeft: Y_AXIS_WIDTH }]}>
         <ThemedText type="small" themeColor="textSecondary">
-          {formatTime(series[0].observedAt)}
+          {formatTime(series[0].bucket)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {formatTime(series[series.length - 1].observedAt)}
+          {formatTime(series[series.length - 1].bucket)}
         </ThemedText>
       </View>
     </View>
