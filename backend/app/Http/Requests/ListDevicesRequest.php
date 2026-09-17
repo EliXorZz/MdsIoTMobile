@@ -9,8 +9,8 @@ class ListDevicesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'online'   => ['nullable', 'boolean'],
-            'room_id'  => ['nullable', 'string'],
+            'online' => ['nullable', 'boolean'],
+            'room_id' => ['nullable', 'string'],
         ];
     }
 }

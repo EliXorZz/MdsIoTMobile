@@ -12,7 +12,7 @@ class TelemetryResource extends JsonResource
         return [
             'observed_at' => $this->observed_at->toIso8601String(),
             'temperature' => $this->temperature,
-            'co2'         => $this->co2,
+            'co2' => $this->co2,
         ];
     }
 }

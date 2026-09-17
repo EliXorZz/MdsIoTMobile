@@ -3,9 +3,9 @@
 namespace App\Listeners;
 
 use App\Events\CommandResultReceived;
+use App\Logging\StructuredLog;
 use App\Models\CommandResult;
 use App\Models\Device;
-use Illuminate\Support\Facades\Log;
 
 class HandleCommandResult
 {
@@ -13,12 +13,16 @@ class HandleCommandResult
     {
         $r = $event->result;
 
-        Log::info('mqtt.result', [
-            'device_id'  => $r->device_id,
-            'command_id' => $r->command_id,
-            'status'     => $r->status,
-            'reason'     => $r->reason,
-        ]);
+        StructuredLog::withContext([
+            'deviceId' => $r->device_id,
+            'eventId' => $r->command_id,
+            'topic' => sprintf('campus/v1/devices/%s/results', $r->device_id),
+            'status' => $r->status,
+            'reason' => $r->reason,
+            'ventilation' => $r->ventilation,
+            'executedAt' => $r->executed_at?->toIso8601String(),
+            'reportedAt' => $r->reported_at?->toIso8601String(),
+        ])->info('command_result.received', 'Command result received');
 
         Device::upsert(
             [['device_id' => $r->device_id]],
@@ -29,10 +33,10 @@ class HandleCommandResult
         CommandResult::updateOrCreate(
             ['command_id' => $r->command_id],
             [
-                'device_id'   => $r->device_id,
-                'status'      => $r->status,
+                'device_id' => $r->device_id,
+                'status' => $r->status,
                 'ventilation' => $r->ventilation,
-                'reason'      => $r->reason,
+                'reason' => $r->reason,
                 'executed_at' => $r->executed_at,
                 'reported_at' => $r->reported_at,
             ],

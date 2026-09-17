@@ -6,14 +6,52 @@ use App\Data\TelemetryData;
 use App\Events\TelemetryBatchReceived;
 use App\Models\Device;
 use App\Models\Telemetry;
+use App\Pipes\Telemetry\CheckSensorFault;
+use Illuminate\Pipeline\Pipeline;
 
 class StoreTelemetryBatch
 {
+    private const ANALYSIS_PIPES = [
+        CheckSensorFault::class,
+    ];
+
+    public function __construct(
+        private readonly Pipeline $pipeline
+    ) {}
+
     public function handle(TelemetryBatchReceived $event): void
     {
-        Telemetry::insertOrIgnore(array_map($this->toRow(...), $event->batch));
+        $batch = $event->batch;
 
-        Device::upsert($this->latestPerDevice($event->batch), ['device_id'], ['room_id', 'last_seen_at']);
+        if (empty($batch)) {
+            return;
+        }
+
+        $rows = array_map(fn (TelemetryData $t) => $this->toRow($t), $batch);
+        Telemetry::insertOrIgnore($rows);
+
+        foreach ($batch as $telemetry) {
+            $this->pipeline->send($telemetry)->through(self::ANALYSIS_PIPES)->thenReturn();
+        }
+
+        $this->upsertDeviceLastSeen($batch);
+    }
+
+    /** @param TelemetryData[] $batch */
+    private function upsertDeviceLastSeen(array $batch): void
+    {
+        $latest = [];
+        foreach ($batch as $t) {
+            if (! isset($latest[$t->device_id]) || $t->observed_at > $latest[$t->device_id]['last_seen_at']) {
+                $latest[$t->device_id] = [
+                    'device_id' => $t->device_id,
+                    'room_id' => $t->room_id,
+                    'last_seen_at' => $t->observed_at,
+                ];
+            }
+        }
+
+        Device::upsert(array_values($latest), ['device_id'], ['room_id', 'last_seen_at']);
     }
 
     private function toRow(TelemetryData $telemetry): array
@@ -26,25 +64,5 @@ class StoreTelemetryBatch
             'temperature' => $telemetry->temperature->value,
             'co2' => $telemetry->co2->value,
         ];
-    }
-
-    /** @param TelemetryData[] $batch */
-    private function latestPerDevice(array $batch): array
-    {
-        $devices = [];
-
-        foreach ($batch as $telemetry) {
-            $id = $telemetry->device_id;
-
-            if (! isset($devices[$id]) || $telemetry->observed_at > $devices[$id]['last_seen_at']) {
-                $devices[$id] = [
-                    'device_id' => $telemetry->device_id,
-                    'room_id' => $telemetry->room_id,
-                    'last_seen_at' => $telemetry->observed_at,
-                ];
-            }
-        }
-
-        return array_values($devices);
     }
 }

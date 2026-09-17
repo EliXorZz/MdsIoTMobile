@@ -2,6 +2,7 @@
 
 namespace App\Data;
 
+use App\Enums\AvailabilityStatus;
 use Carbon\CarbonImmutable;
 use Spatie\LaravelData\Attributes\WithCast;
 use Spatie\LaravelData\Casts\DateTimeInterfaceCast;
@@ -12,7 +13,8 @@ class AvailabilityData extends Data
     public function __construct(
         public readonly int $schema_version,
         public readonly string $device_id,
-        public readonly string $status,
+        public readonly AvailabilityStatus $status,
+
         // Null on Will messages (broker publishes without a timestamp)
         #[WithCast(DateTimeInterfaceCast::class, format: ['Y-m-d\TH:i:s.v\Z', 'Y-m-d\TH:i:s\Z'])]
         public readonly ?CarbonImmutable $reported_at,

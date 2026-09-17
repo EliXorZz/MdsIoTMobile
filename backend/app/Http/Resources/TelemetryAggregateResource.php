@@ -11,12 +11,12 @@ class TelemetryAggregateResource extends JsonResource
     {
         return [
             'bucket' => $this->bucket->toIso8601String(),
-            'temperature' => $this->median_temperature,
-            'min_temperature' => $this->min_temperature,
-            'max_temperature' => $this->max_temperature,
-            'co2' => $this->median_co2,
-            'min_co2' => $this->min_co2,
-            'max_co2' => $this->max_co2,
+            'temperature' => round((float) $this->median_temperature, 1),
+            'min_temperature' => round((float) $this->min_temperature, 1),
+            'max_temperature' => round((float) $this->max_temperature, 1),
+            'co2' => (int) round((float) $this->median_co2),
+            'min_co2' => (int) round((float) $this->min_co2),
+            'max_co2' => (int) round((float) $this->max_co2),
             'samples' => $this->samples,
         ];
     }

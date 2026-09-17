@@ -21,9 +21,14 @@ class DeviceResource extends JsonResource
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
             'latest_telemetry' => $this->latestTelemetry ? [
-                'bucket'      => $this->latestTelemetry->observed_at->toIso8601String(),
-                'temperature' => $this->latestTelemetry->temperature,
-                'co2'         => $this->latestTelemetry->co2,
+                'co2_alert' => (bool) $this->co2_alert,
+                'bucket' => $this->latestTelemetry->bucket->toIso8601String(),
+                'temperature' => round((float) $this->latestTelemetry->median_temperature, 1),
+                'min_temperature' => round((float) $this->latestTelemetry->min_temperature, 1),
+                'max_temperature' => round((float) $this->latestTelemetry->max_temperature, 1),
+                'co2' => (int) round((float) $this->latestTelemetry->median_co2),
+                'min_co2' => (int) round((float) $this->latestTelemetry->min_co2),
+                'max_co2' => (int) round((float) $this->latestTelemetry->max_co2),
             ] : null,
         ];
     }

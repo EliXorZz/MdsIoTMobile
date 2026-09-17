@@ -12,7 +12,7 @@ return new class extends Migration
         // 1m — base depuis les données brutes (latest sensor value + short ranges)
         DB::statement("
             CREATE MATERIALIZED VIEW telemetry_1m
-            WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+            WITH (timescaledb.continuous, timescaledb.materialized_only = true) AS
             SELECT
                 time_bucket('1 minute', observed_at)                                   AS bucket,
                 device_id,
@@ -32,7 +32,7 @@ return new class extends Migration
         // p5/p95 sur temperature et co2 pour ignorer les outliers (spikes capteur)
         DB::statement("
             CREATE MATERIALIZED VIEW telemetry_5m
-            WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+            WITH (timescaledb.continuous, timescaledb.materialized_only = true) AS
             SELECT
                 time_bucket('5 minutes', observed_at)                                  AS bucket,
                 device_id,
@@ -51,7 +51,7 @@ return new class extends Migration
         // 1h — hierarchical depuis 5m (vue 7 derniers jours)
         DB::statement("
             CREATE MATERIALIZED VIEW telemetry_1h
-            WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+            WITH (timescaledb.continuous, timescaledb.materialized_only = true) AS
             SELECT
                 time_bucket('1 hour', bucket)                                         AS bucket,
                 device_id,
@@ -70,7 +70,7 @@ return new class extends Migration
         // 1d — hierarchical depuis 1h (vue mois / année)
         DB::statement("
             CREATE MATERIALIZED VIEW telemetry_1d
-            WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+            WITH (timescaledb.continuous, timescaledb.materialized_only = true) AS
             SELECT
                 time_bucket('1 day', bucket)                                          AS bucket,
                 device_id,
@@ -114,9 +114,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("DROP MATERIALIZED VIEW IF EXISTS telemetry_1d CASCADE");
-        DB::statement("DROP MATERIALIZED VIEW IF EXISTS telemetry_1h CASCADE");
-        DB::statement("DROP MATERIALIZED VIEW IF EXISTS telemetry_5m CASCADE");
-        DB::statement("DROP MATERIALIZED VIEW IF EXISTS telemetry_1m CASCADE");
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_1d CASCADE');
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_1h CASCADE');
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_5m CASCADE');
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_1m CASCADE');
     }
 };

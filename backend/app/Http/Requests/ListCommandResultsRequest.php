@@ -9,7 +9,7 @@ class ListCommandResultsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status'   => ['nullable', 'string'],
+            'status' => ['nullable', 'string'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
     }

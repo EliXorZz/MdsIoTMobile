@@ -3,11 +3,15 @@
 namespace App\Providers;
 
 use App\Events\CommandResultReceived;
+use App\Events\DeviceAlertChanged;
 use App\Events\DeviceAvailabilityChanged;
 use App\Events\DeviceStateReceived;
+use App\Events\SSEEvent;
 use App\Events\TelemetryBatchReceived;
+use App\Listeners\BroadcastToSSE;
 use App\Listeners\HandleCommandResult;
 use App\Listeners\StoreTelemetryBatch;
+use App\Listeners\UpdateDeviceAlert;
 use App\Listeners\UpdateDeviceAvailability;
 use App\Listeners\UpdateDeviceState;
 use Illuminate\Console\Events\CommandStarting;
@@ -34,10 +38,13 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        Event::listen(SSEEvent::class, BroadcastToSSE::class);
+
         Event::listen(DeviceStateReceived::class, UpdateDeviceState::class);
         Event::listen(DeviceAvailabilityChanged::class, UpdateDeviceAvailability::class);
         Event::listen(CommandResultReceived::class, HandleCommandResult::class);
         Event::listen(TelemetryBatchReceived::class, StoreTelemetryBatch::class);
+        Event::listen(DeviceAlertChanged::class, UpdateDeviceAlert::class);
 
         JsonResource::macro('paginationInformation', function ($request, $paginated, $default) {
             return [

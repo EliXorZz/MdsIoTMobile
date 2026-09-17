@@ -48,6 +48,7 @@ class DeviceController extends Controller
 
         $query = TelemetryAggregate::resolution($resolution)
             ->where('device_id', $device->device_id)
+            ->where('bucket', '<', $resolution->currentBucketStart())
             ->orderBy('bucket');
 
         if ($data['from'] ?? null) {

@@ -20,19 +20,24 @@ class Device extends Model
         'ventilation',
         'boot_id',
         'online',
+        'co2_alert',
         'last_seen_at',
     ];
 
     protected $casts = [
         'ventilation' => 'boolean',
-        'online' => 'boolean',
+        'online'      => 'boolean',
+        'co2_alert'   => 'boolean',
         'last_seen_at' => 'immutable_datetime',
     ];
 
     public function latestTelemetry(): HasOne
     {
-        return $this->hasOne(Telemetry::class, 'device_id', 'device_id')
-            ->ofMany(['observed_at' => 'MAX']);
+        return $this->hasOne(TelemetryOneMinute::class, 'device_id', 'device_id')
+            ->ofMany(
+                ['bucket' => 'MAX'],
+                fn ($q) => $q->where('bucket', '<', now()->startOfMinute()),
+            );
     }
 
     public function telemetry(): HasMany

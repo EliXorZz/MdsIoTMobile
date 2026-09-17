@@ -10,9 +10,11 @@ class Telemetry extends Model
     protected $table = 'telemetry';
 
     protected $primaryKey = 'message_id';
+
     protected $keyType = 'string';
 
     public $timestamps = false;
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -27,7 +29,7 @@ class Telemetry extends Model
     protected $casts = [
         'observed_at' => 'immutable_datetime',
         'temperature' => 'float',
-        'co2'         => 'integer',
+        'co2' => 'integer',
     ];
 
     public function scopeBucketed(Builder $query, int $minutes): Builder

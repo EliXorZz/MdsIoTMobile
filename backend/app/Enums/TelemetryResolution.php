@@ -21,6 +21,16 @@ enum TelemetryResolution: string
         };
     }
 
+    public function currentBucketStart(): Carbon
+    {
+        return match ($this) {
+            self::OneMinute => now()->startOfMinute(),
+            self::FiveMinutes => now()->startOfHour()->addMinutes((int) floor(now()->minute / 5) * 5),
+            self::OneHour => now()->startOfHour(),
+            self::OneDay => now()->startOfDay(),
+        };
+    }
+
     public static function forRange(?string $from, ?string $to): self
     {
         $start = $from ? Carbon::parse($from) : now()->subDay();

@@ -4,11 +4,11 @@ namespace App\Services;
 
 use App\Data\TelemetryData;
 use App\Events\TelemetryBatchReceived;
+use App\Logging\StructuredLog;
 
 class TelemetryIngestionService
 {
     private const BATCH_SIZE = 500;
-
     private const FLUSH_EVERY_S = 0.2;
 
     /** @var TelemetryData[] */
@@ -17,9 +17,7 @@ class TelemetryIngestionService
     private float $lastFlush = 0;
 
     private int $received = 0;
-
     private int $inserted = 0;
-
     private int $rejected = 0;
 
     public function __construct()
@@ -55,6 +53,14 @@ class TelemetryIngestionService
         $batch = $this->buffer;
         $this->buffer = [];
         $this->lastFlush = microtime(true);
+
+        StructuredLog::withContext([
+            'batchCount' => count($batch),
+            'received' => $this->received,
+            'rejected' => $this->rejected,
+            'inserted' => $this->inserted,
+            'lag' => $this->lag(),
+        ])->debug('telemetry.batch_flushed', 'Telemetry batch sent for persistence');
 
         event(new TelemetryBatchReceived($batch));
         $this->inserted += count($batch);

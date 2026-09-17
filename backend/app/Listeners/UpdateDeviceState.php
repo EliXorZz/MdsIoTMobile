@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\DeviceStateReceived;
+use App\Logging\StructuredLog;
 use App\Models\Device;
-use Illuminate\Support\Facades\Log;
 
 class UpdateDeviceState
 {
@@ -12,12 +12,14 @@ class UpdateDeviceState
     {
         $s = $event->state;
 
-        Log::info('mqtt.state', [
-            'device_id'   => $s->device_id,
+        StructuredLog::withContext([
+            'deviceId' => $s->device_id,
+            'topic' => sprintf('campus/v1/devices/%s/state', $s->device_id),
+            'status' => 'accepted',
             'ventilation' => $s->ventilation,
-            'boot_id'     => $s->boot_id,
-            'reported_at' => $s->reported_at->toIso8601String(),
-        ]);
+            'bootId' => $s->boot_id,
+            'reportedAt' => $s->reported_at->toIso8601String(),
+        ])->info('state.received', 'Device state received');
 
         Device::upsert(
             [['device_id' => $s->device_id, 'ventilation' => $s->ventilation, 'boot_id' => $s->boot_id]],
