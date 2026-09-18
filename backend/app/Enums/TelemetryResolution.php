@@ -13,37 +13,29 @@ enum TelemetryResolution: string
 
     public function view(): string
     {
-        return match ($this) {
-            self::OneMinute => 'telemetry_1m',
-            self::FiveMinutes => 'telemetry_5m',
-            self::OneHour => 'telemetry_1h',
-            self::OneDay => 'telemetry_1d',
-        };
+        return 'telemetry_'.$this->value;
     }
 
     public function currentBucketStart(): Carbon
     {
         return match ($this) {
-            self::OneMinute => now()->startOfMinute(),
-            self::FiveMinutes => now()->startOfHour()->addMinutes((int) floor(now()->minute / 5) * 5),
-            self::OneHour => now()->startOfHour(),
-            self::OneDay => now()->startOfDay(),
+            self::OneMinute   => now()->floorMinutes(1),
+            self::FiveMinutes => now()->floorMinutes(5),
+            self::OneHour     => now()->floorHours(1),
+            self::OneDay      => now()->startOfDay(),
         };
     }
 
     public static function forRange(?string $from, ?string $to): self
     {
-        $start = $from ? Carbon::parse($from) : now()->subDay();
-        $end = $to ? Carbon::parse($to) : now();
-
-        $hours = $start->diffInHours($end);
-        $days = $start->diffInDays($end);
+        $hours = ($from ? Carbon::parse($from) : now()->subDay())
+            ->diffInHours($to ? Carbon::parse($to) : now());
 
         return match (true) {
-            $hours <= 12 => self::OneMinute,
-            $days <= 2 => self::FiveMinutes,
-            $days <= 7 => self::OneHour,
-            default => self::OneDay,
+            $hours <= 12  => self::OneMinute,
+            $hours <= 48  => self::FiveMinutes,
+            $hours <= 168 => self::OneHour,
+            default       => self::OneDay,
         };
     }
 }
