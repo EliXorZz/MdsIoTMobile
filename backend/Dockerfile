@@ -10,10 +10,12 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     libfreetype6-dev \
     libpq-dev \
-    && pecl install redis \
+    libssl-dev \
+    pkg-config \
+    && pecl install redis mongodb \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd pdo bcmath pdo_pgsql pcntl \
-    && docker-php-ext-enable redis
+    && docker-php-ext-enable redis mongodb
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY . .

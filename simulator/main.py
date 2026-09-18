@@ -147,8 +147,8 @@ def main():
     devices_file = sys.argv[1] if len(sys.argv) > 1 else 'devices.json'
     with open(devices_file, encoding='utf-8') as f:
         entries = json.load(f)
-    if not isinstance(entries, list) or not entries or len(entries) > 100:
-        raise ValueError('devices.json : entre 1 et 100 objets')
+    if not isinstance(entries, list) or len(entries) > 100:
+        raise ValueError('devices.json : entre 0 et 100 objets')
     ids = set()
     for e in entries:
         if not isinstance(e, dict) or any(not isinstance(e.get(k), str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', e[k]) for k in ('device_id', 'room_id')):

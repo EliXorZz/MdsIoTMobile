@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\DeviceStateReceived;
+use App\Logging\LogEvent;
 use App\Logging\StructuredLog;
 use App\Models\Device;
 
@@ -19,7 +20,7 @@ class UpdateDeviceState
             'ventilation' => $s->ventilation,
             'bootId' => $s->boot_id,
             'reportedAt' => $s->reported_at->toIso8601String(),
-        ])->info('state.received', 'Device state received');
+        ])->info(LogEvent::StateReceived, 'Device state received');
 
         Device::upsert(
             [['device_id' => $s->device_id, 'ventilation' => $s->ventilation, 'boot_id' => $s->boot_id]],

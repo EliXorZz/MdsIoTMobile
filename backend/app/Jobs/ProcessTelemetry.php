@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Jobs;
+
+use Carbon\Carbon;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+
+class ProcessTelemetry implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(
+        public readonly string $topic,
+        public readonly string $payload,
+        public readonly Carbon $enqueuedAt,
+    ) {
+        $this->onQueue('telemetry');
+    }
+
+    public function handle(): void {}
+}

@@ -35,6 +35,13 @@ def publish_all(devices, total, qos, on_progress):
     sent = 0
     per_device = total // len(devices)
 
+    acked = [0]
+    lock  = threading.Lock()
+
+    def on_publish(client, userdata, mid, reason_code, properties):
+        with lock:
+            acked[0] += 1
+
     clients = []
     for d in devices:
         c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"loadtest-{d['boot_id']}", clean_session=True)
@@ -42,6 +49,8 @@ def publish_all(devices, total, qos, on_progress):
             os.getenv("MQTT_USER", "simulator"),
             os.getenv("MQTT_PASSWORD", "simulator-demo"),
         )
+        c.on_publish = on_publish
+        c.max_inflight_messages_set(100)
         c.connect(os.getenv("MQTT_HOST", "localhost"), int(os.getenv("MQTT_PORT", "1883")), keepalive=60)
         c.loop_start()
         clients.append(c)
@@ -52,13 +61,26 @@ def publish_all(devices, total, qos, on_progress):
             d["seq"] += 1
             msg = make_message(d["device_id"], d["room_id"], d["boot_id"], d["seq"])
             topic = f"campus/v1/devices/{d['device_id']}/telemetry"
-            c.publish(topic, json.dumps(msg), qos=qos)
-            sent += 1
+            payload = json.dumps(msg)
+            while True:
+                info = c.publish(topic, payload, qos=qos)
+                if info.rc == mqtt.MQTT_ERR_SUCCESS:
+                    sent += 1
+                    break
+                elif info.rc == mqtt.MQTT_ERR_QUEUE_SIZE:
+                    time.sleep(0.005)
+                else:
+                    raise RuntimeError(f"publish failed: rc={info.rc}")
         if sent % 1000 == 0:
             elapsed = time.monotonic() - start
             on_progress(sent, total, elapsed)
 
-    # flush
+    # Wait for broker to PUBACK all QoS 1 messages before disconnecting
+    if qos >= 1:
+        deadline = time.monotonic() + 120
+        while acked[0] < sent and time.monotonic() < deadline:
+            time.sleep(0.05)
+
     for c in clients:
         c.loop_stop()
         c.disconnect()

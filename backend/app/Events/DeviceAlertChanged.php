@@ -27,12 +27,12 @@ class DeviceAlertChanged implements SSEEvent
     {
         return [
             'device_id' => $this->deviceId,
-            'room_id'   => $this->roomId,
-            'metric'    => $this->metric,
-            'value'     => $this->value,
-            'unit'      => $this->unit,
+            'room_id' => $this->roomId,
+            'metric' => $this->metric,
+            'value' => $this->value,
+            'unit' => $this->unit,
             'threshold' => $this->threshold,
-            'status'    => $this->status,
+            'status' => $this->status,
         ];
     }
 }

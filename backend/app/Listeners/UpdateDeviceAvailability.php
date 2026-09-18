@@ -14,7 +14,7 @@ class UpdateDeviceAvailability
 
         $values = [
             'device_id' => $a->device_id,
-            'online'    => $a->status === AvailabilityStatus::Online,
+            'online' => $a->status === AvailabilityStatus::Online,
         ];
 
         if ($a->reported_at) {
