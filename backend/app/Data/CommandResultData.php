@@ -2,6 +2,7 @@
 
 namespace App\Data;
 
+use App\Enums\DeviceResultStatus;
 use Carbon\CarbonImmutable;
 use Spatie\LaravelData\Attributes\WithCast;
 use Spatie\LaravelData\Casts\DateTimeInterfaceCast;
@@ -14,7 +15,7 @@ class CommandResultData extends Data
 
         public readonly string $device_id,
         public readonly string $command_id,
-        public readonly string $status,
+        public readonly DeviceResultStatus $status,
 
         #[WithCast(DateTimeInterfaceCast::class, format: ['Y-m-d\TH:i:s.v\Z', 'Y-m-d\TH:i:s\Z'])]
         public readonly ?CarbonImmutable $executed_at,

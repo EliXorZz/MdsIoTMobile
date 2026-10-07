@@ -38,4 +38,14 @@ enum LogEvent: string
     // Command results
     case CommandResultReceived = 'command_result.received';
     case CommandResultRejected = 'command_result.rejected';
+
+    // Command lifecycle
+    case CommandIssued = 'command.issued';
+    case CommandSent = 'command.sent';
+    case CommandSendFailed = 'command.send_failed';
+    case CommandAcknowledged = 'command.acknowledged';
+    case CommandFailed = 'command.failed';
+    case CommandTimeout = 'command.timeout';
+    case CommandLateAck = 'command.late_ack';
+    case CommandDuplicate = 'command.duplicate';
 }

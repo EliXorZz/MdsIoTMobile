@@ -26,10 +26,10 @@ class Device extends Model
     ];
 
     protected $casts = [
-        'ventilation'       => 'boolean',
-        'online'            => 'boolean',
-        'co2_alert'         => 'boolean',
-        'last_seen_at'      => 'immutable_datetime',
+        'ventilation' => 'boolean',
+        'online' => 'boolean',
+        'co2_alert' => 'boolean',
+        'last_seen_at' => 'immutable_datetime',
         'state_reported_at' => 'immutable_datetime',
     ];
 
@@ -50,5 +50,10 @@ class Device extends Model
     public function commandResults(): HasMany
     {
         return $this->hasMany(CommandResult::class, 'device_id', 'device_id');
+    }
+
+    public function commands(): HasMany
+    {
+        return $this->hasMany(Command::class, 'device_id', 'device_id');
     }
 }

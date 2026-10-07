@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Device;
 use App\Models\Telemetry;
 use App\Prometheus\FixedLaravelCacheAdapter;
+use App\Services\MqttPublisher;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Cache;
@@ -21,10 +22,22 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(MqttPublisher::class, function () {
+            $conn = config('mqtt-client.connections.default');
+
+            return new MqttPublisher(
+                $conn['host'],
+                (int) ($conn['port'] ?? 1883),
+                $conn['connection_settings']['auth']['username'] ?? null,
+                $conn['connection_settings']['auth']['password'] ?? null,
+            );
+        });
+
         $this->app->singleton(AMQPChannel::class, function () {
             /** @var RabbitMQQueue $queue */
             $queue = Queue::connection('rabbitmq');
             $channel = $queue->getChannel();
+
             return $channel;
         });
 

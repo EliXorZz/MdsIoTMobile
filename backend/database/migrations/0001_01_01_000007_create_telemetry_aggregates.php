@@ -110,10 +110,13 @@ return new class extends Migration
         DB::statement("CALL refresh_continuous_aggregate('telemetry_5m', NULL, NULL)");
         DB::statement("CALL refresh_continuous_aggregate('telemetry_1h', NULL, NULL)");
         DB::statement("CALL refresh_continuous_aggregate('telemetry_1d', NULL, NULL)");
+
+        DB::statement("SELECT add_retention_policy('telemetry', INTERVAL '2 days')");
     }
 
     public function down(): void
     {
+        DB::statement("SELECT remove_retention_policy('telemetry', if_exists => true)");
         DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_1d CASCADE');
         DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_1h CASCADE');
         DB::statement('DROP MATERIALIZED VIEW IF EXISTS telemetry_5m CASCADE');
