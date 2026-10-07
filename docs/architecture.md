@@ -206,7 +206,7 @@ Ses responsabilités sont :
 1. recevoir le message MQTT ;
 2. désérialiser et valider le JSON via `TelemetryData` (Spatie Laravel Data) ;
 3. accumuler les mesures valides dans `TelemetryIngestionService` (buffer en mémoire) ;
-4. rejeter silencieusement les messages malformés (compteur `rejected`) ;
+4. rejeter les messages malformés (JSON invalide, `device_id` incohérent, message trop ancien, échec de validation) avec un log d'avertissement détaillé et un compteur `rejected` ;
 5. vider le buffer par lots (`TelemetryBatchReceived`) dès que 500 mesures sont en attente ou toutes les 200 ms ;
 6. persister le lot en une seule requête `insertOrIgnore` + `upsert` via `StoreTelemetryBatch`.
 
@@ -235,24 +235,26 @@ Laravel fournit une API REST destinée à l'application React Native.
 Endpoints disponibles :
 
 ```text
-POST   /api/login
-POST   /api/logout
+GET    /api/health
 
 GET    /api/devices              ?online=&room_id=
 GET    /api/devices/{id}
+GET    /api/devices/events           (Server-Sent Events)
 
 GET    /api/devices/{id}/telemetry   ?from=&to=
-GET    /api/devices/{id}/commands
+GET    /api/devices/{id}/commands    ?status=&per_page=
 ```
+
+> Aucune authentification n'est actuellement appliquée sur ces routes (pas de middleware `auth`, pas d'endpoints `login`/`logout`).
 
 La résolution des données de télémétrie est choisie automatiquement en fonction de la plage demandée (`from`/`to`) :
 
-| Plage          | Vue utilisée     | Granularité |
-| -------------- | ---------------- | ----------- |
-| ≤ 12 heures    | `telemetry_1m`   | 1 minute    |
-| ≤ 2 jours      | `telemetry_5m`   | 5 minutes   |
-| ≤ 7 jours      | `telemetry_1h`   | 1 heure     |
-| > 7 jours      | `telemetry_1d`   | 1 jour      |
+| Plage       | Vue utilisée   | Granularité |
+| ----------- | -------------- | ----------- |
+| ≤ 12 heures | `telemetry_1m` | 1 minute    |
+| ≤ 2 jours   | `telemetry_5m` | 5 minutes   |
+| ≤ 7 jours   | `telemetry_1h` | 1 heure     |
+| > 7 jours   | `telemetry_1d` | 1 jour      |
 
 Exemple de réponse `/api/devices/{id}/telemetry` :
 
@@ -289,8 +291,8 @@ Exemple :
 
 ```text
 users
-sensors
-sensor_user
+devices
+command_results
 ```
 
 ## 6.2 Données temporelles
@@ -302,12 +304,12 @@ telemetry (hypertable, partitionnée par observed_at)
 ├── observed_at  timestamptz   — horodatage métier du capteur
 ├── device_id    string
 ├── room_id      string
-├── message_id   string (PK)   — déduplication native
+├── message_id   string        — unique avec observed_at, déduplication native
 ├── temperature  float
 └── co2          integer
 ```
 
-Quatre vues continues (`MATERIALIZED VIEW ... WITH timescaledb.continuous`) agrègent les données brutes par intervalles de temps, avec `materialized_only = false` (real-time aggregation : les buckets non encore matérialisés sont calculés à la volée) :
+Quatre vues continues (`MATERIALIZED VIEW ... WITH timescaledb.continuous`) agrègent les données brutes par intervalles de temps, avec `materialized_only = true` (seules les données déjà matérialisées sont exposées) :
 
 ```text
 telemetry_1m  ← telemetry (raw)   bucket 1 min  — latest sensor value + plages ≤ 12h
@@ -400,9 +402,9 @@ flowchart TB
 
     subgraph Docker["🐳 Docker"]
 
-        API["Laravel API"]
+        API["backend (Laravel API)"]
 
-        WORKER["Laravel MQTT Consumer"]
+        WORKER["subscriber (Laravel MQTT Consumer)"]
 
         MQTT["Mosquitto"]
 
@@ -425,24 +427,22 @@ flowchart TB
 
 ## 8.1 Services Docker
 
-Le projet pourra être organisé autour des services suivants :
+Le projet est organisé autour des services suivants (voir `compose.yaml`) :
 
 ```text
-docker-compose.yml
+compose.yaml
 
 services:
 
-  api
-    → Laravel API
-
-  worker
-    → Laravel MQTT Consumer
-
-  mosquitto
-    → MQTT Broker
-
-  postgres
-    → PostgreSQL + TimescaleDB
+  backend      → Laravel API (php-fpm, derrière nginx)
+  subscriber   → Laravel MQTT Consumer (php artisan mqtt:subscribe)
+  nginx        → Reverse proxy HTTP exposé à l'extérieur
+  mosquitto    → MQTT Broker
+  postgres     → PostgreSQL + TimescaleDB
+  redis        → Cache / files d'attente Laravel
+  simulator    → Simulateur de capteurs (publie sur Mosquitto)
+  tools        → CLI d'administration MQTT (profil "tools")
+  tests        → Suite de tests Python (profil "test")
 ```
 
 Exemple d'organisation :
@@ -638,3 +638,51 @@ Le consumer MQTT étant séparé de l'API, il pourra notamment être dimensionn�
 ```
 
 Cette architecture permet ainsi de séparer clairement **l'acquisition des données**, **leur transport**, **leur traitement**, **leur stockage** et **leur consommation par l'utilisateur final**.
+
+---
+
+# 14. Chemin détaillé d'une télémétrie (MQTT → PostgreSQL)
+
+```mermaid
+sequenceDiagram
+    participant S as 📡 Capteur
+    participant M as 📨 Mosquitto
+    participant P as ⚙️ subscriber (process unique)
+    participant BUF as 🧠 Buffer mémoire (PHP array)
+    participant L as StoreTelemetryBatch (listener sync)
+    participant DB as 🗄️ PostgreSQL (table telemetry)
+
+    S->>M: PUBLISH campus/v1/devices/{id}/telemetry
+    M->>P: MESSAGE (onTelemetry)
+    P->>P: JSON valide ? device_id == topic ? age <= 30s ? TelemetryData::from()
+    alt payload invalide
+        P-->>P: reject() (compteur "rejected", log warning)
+    else payload valide
+        P->>BUF: push(TelemetryData) — received++
+        note over BUF: message reçu mais PAS ENCORE durable :<br/>simple tableau en RAM du process subscriber
+    end
+
+    loop chaque tick de la boucle MQTT (mqtt->loop)
+        P->>P: flushIfNeeded()
+        note over P: seuil : buffer >= 500 messages OU 200ms écoulées
+    end
+
+    P->>BUF: flush() vide le tableau, fige le lot
+    P->>L: event(TelemetryBatchReceived) — listener NON queued, exécuté inline
+    activate L
+    L->>DB: Telemetry::insertOrIgnore(lot) — écriture durable, dédup (message_id, observed_at)
+    L->>DB: Device::upsert(last_seen_at, room_id) par device_id
+    L->>L: pipeline CheckSensorFault (analyse post-insert)
+    deactivate L
+    P-->>P: inserted += count(lot)
+
+    note over P,DB: PostgreSQL n'intervient qu'ici : une seule fois par lot,<br/>de façon synchrone et bloquante pour la boucle MQTT.
+```
+
+**Points clés de ce flux :**
+
+- Le processus `subscriber` (commande `mqtt:subscribe`) est **mono-processus** : réception MQTT, bufferisation et écriture SQL se déroulent dans le même process PHP, sans worker de queue séparé (`StoreTelemetryBatch` n'implémente pas `ShouldQueue`).
+- Un message est considéré **ingéré avec succès** seulement une fois le lot inséré via `Telemetry::insertOrIgnore()` — pas au moment où il entre dans le buffer.
+- Le buffer en mémoire ne contient que des `TelemetryData` déjà validés (JSON correct, `device_id` cohérent avec le topic, âge ≤ 30 s) ; **rien n'est persisté** entre la réception MQTT et le flush : un arrêt brutal du process perd les messages non encore flushés (fenêtre de perte ≤ 500 messages / 200 ms).
+- `TelemetryBatchReceived` déclenche de façon **synchrone** l'unique listener `StoreTelemetryBatch`, qui écrit le lot en base puis met à jour `devices.last_seen_at`/`room_id` et exécute l'analyse `CheckSensorFault`.
+- PostgreSQL n'intervient donc qu'à un seul point du chemin critique MQTT : l'écriture groupée (`insertOrIgnore` + `upsert`) déclenchée par le flush, ce qui bloque momentanément la boucle MQTT pendant l'écriture.
