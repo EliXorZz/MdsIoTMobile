@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\StoreDatalakeTelemetry;
+use App\Prometheus\PipelineMetrics;
 use Illuminate\Support\Facades\DB;
 
 class MongoConsumer extends BatchConsumer
@@ -32,6 +33,8 @@ class MongoConsumer extends BatchConsumer
         DB::connection('mongodb')
             ->table('raw_telemetry')
             ->insert($docs);
+
+        app(PipelineMetrics::class)->datalakeStored(count($docs));
     }
 
     protected function queue(): string

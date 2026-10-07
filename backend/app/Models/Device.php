@@ -22,13 +22,15 @@ class Device extends Model
         'online',
         'co2_alert',
         'last_seen_at',
+        'state_reported_at',
     ];
 
     protected $casts = [
-        'ventilation' => 'boolean',
-        'online' => 'boolean',
-        'co2_alert' => 'boolean',
-        'last_seen_at' => 'immutable_datetime',
+        'ventilation'       => 'boolean',
+        'online'            => 'boolean',
+        'co2_alert'         => 'boolean',
+        'last_seen_at'      => 'immutable_datetime',
+        'state_reported_at' => 'immutable_datetime',
     ];
 
     public function latestTelemetry(): HasOne

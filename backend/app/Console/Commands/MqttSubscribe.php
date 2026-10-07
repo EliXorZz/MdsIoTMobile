@@ -11,6 +11,7 @@ use App\Events\DeviceStateReceived;
 use App\Events\RawTelemetryReceived;
 use App\Logging\LogEvent;
 use App\Logging\StructuredLog;
+use App\Prometheus\PipelineMetrics;
 use Illuminate\Console\Command;
 use PhpMqtt\Client\ConnectionManager;
 use PhpMqtt\Client\Exceptions\ClientNotConnectedToBrokerException;
@@ -138,6 +139,7 @@ class MqttSubscribe extends Command
     {
         RawTelemetryReceived::dispatch($topic, $message);
         $this->telemetryCount++;
+        app(PipelineMetrics::class)->mqttReceived();
     }
 
     private function onState(string $topic, string $message): void

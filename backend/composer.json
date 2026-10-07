@@ -15,6 +15,7 @@
         "mongodb/laravel-mongodb": "^5.11",
         "php-mqtt/laravel-client": "^1.8",
         "spatie/laravel-data": "^4.23",
+        "spatie/laravel-prometheus": "^1.7",
         "vladimir-yuldashev/laravel-queue-rabbitmq": "^15.0"
     },
     "require-dev": {

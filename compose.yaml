@@ -114,8 +114,10 @@ services:
     ports:
       - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
       - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "127.0.0.1:${RABBITMQ_PROMETHEUS_PORT:-15692}:15692"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 5s
@@ -175,7 +177,7 @@ services:
   worker:
     build: ./backend
     env_file: ./backend/.env
-    command: ["php", "artisan", "telemetry:consume", "--batch=2000", "--timeout=5"]
+    command: ["php", "artisan", "telemetry:consume", "--batch=2000", "--timeout=0.2"]
     environment:
       DB_HOST: postgres
       REDIS_HOST: redis
@@ -220,6 +222,71 @@ services:
       - backend
     restart: unless-stopped
 
+  mosquitto-exporter:
+    image: sapcc/mosquitto-exporter:0.8.0
+    command:
+      - --endpoint=tcp://mosquitto:1883
+      - --bind-address=0.0.0.0:9234
+      - --user=teacher
+      - --pass=${TEACHER_PASSWORD:-teacher-demo}
+    ports:
+      - "127.0.0.1:9234:9234"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.2.0
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    volumes:
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    restart: unless-stopped
+
 volumes:
   broker-data:
   postgres-data:
@@ -227,3 +294,6 @@ volumes:
   redis-data:
   backend-storage:
   mongodb-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:

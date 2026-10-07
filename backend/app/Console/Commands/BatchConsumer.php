@@ -36,7 +36,7 @@ abstract class BatchConsumer extends Command
         $this->workerId = gethostname().':'.getmypid();
 
         $batchSize = (int) $this->option('batch');
-        $timeout = (int) $this->option('timeout');
+        $timeout = (float) $this->option('timeout');
 
         pcntl_async_signals(true);
         pcntl_signal(SIGTERM, fn () => $this->running = false);

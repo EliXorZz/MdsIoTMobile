@@ -25,7 +25,7 @@ scrape_configs:
     pipeline_stages:
       # Parse JSON only for Laravel services (structured logs)
       - match:
-          selector: '{service=~"backend|subscriber"}'
+          selector: '{service=~"backend|subscriber|worker|datalake-worker"}'
           stages:
             - json:
                 expressions:

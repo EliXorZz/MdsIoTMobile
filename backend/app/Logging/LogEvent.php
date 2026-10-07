@@ -25,7 +25,9 @@ enum LogEvent: string
     // Telemetry consumer
     case TelemetryMessageDropped = 'telemetry_consumer.message_dropped';
     case TelemetryInvalidPayload = 'telemetry_consumer.invalid_payload';
+    case TelemetryExpired = 'telemetry_consumer.expired';
     case TelemetryConsumerLag = 'telemetry_consumer.lag';
+    case TelemetryDuplicates = 'telemetry_consumer.duplicates';
 
     // Device state / availability
     case StateReceived = 'state.received';
