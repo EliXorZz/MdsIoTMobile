@@ -83,11 +83,16 @@ class TelemetryConsumer extends BatchConsumer
         if (! empty($rows)) {
             Device::upsert(
                 collect($rows)
-                    ->unique('device_id')
-                    ->map(fn ($row) => ['device_id' => $row['device_id'], 'room_id' => $row['room_id']])
+                    ->groupBy('device_id')
+                    ->map(fn ($group) => [
+                        'device_id' => $group->first()['device_id'],
+                        'room_id' => $group->first()['room_id'],
+                        'last_telemetry_at' => $group->max('observed_at'),
+                    ])
+                    ->values()
                     ->all(),
                 ['device_id'],
-                ['room_id'],
+                ['room_id', 'last_telemetry_at'],
             );
 
             $inserted = Telemetry::insertOrIgnore($rows);

@@ -22,6 +22,7 @@ class Device extends Model
         'online',
         'co2_alert',
         'last_seen_at',
+        'last_telemetry_at',
         'state_reported_at',
     ];
 
@@ -30,6 +31,7 @@ class Device extends Model
         'online' => 'boolean',
         'co2_alert' => 'boolean',
         'last_seen_at' => 'immutable_datetime',
+        'last_telemetry_at' => 'immutable_datetime',
         'state_reported_at' => 'immutable_datetime',
     ];
 

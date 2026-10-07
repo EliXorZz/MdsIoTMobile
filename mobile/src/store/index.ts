@@ -21,12 +21,12 @@ import {
 
 import { api } from "./api";
 
-// Seul le cache RTK Query est persisté : les capteurs restent visibles hors-ligne
-// avec l'horodatage (fulfilledTimeStamp) de leur dernière récupération réussie.
+// Le cache RTK Query n'est PAS persisté : onCacheEntryAdded (SSE) ne se déclenche
+// pas sur une entrée réhydratée. Les données sont refetchées au démarrage.
 const persistConfig = {
   key: "root",
   storage: AsyncStorage,
-  whitelist: [api.reducerPath],
+  blacklist: [api.reducerPath],
 };
 
 const rootReducer = combineReducers({

@@ -41,6 +41,20 @@ export type TelemetryResponse = {
   data: TelemetryPoint[];
 };
 
+export type CommandStatus = "PENDING" | "SENT" | "ACKNOWLEDGED" | "FAILED" | "TIMEOUT";
+
+export type Command = {
+  command_id: string;
+  device_id: string;
+  action: string;
+  params: Record<string, unknown>;
+  status: CommandStatus;
+  issued_at: string;
+  sent_at: string | null;
+  acked_at: string | null;
+  timeout_at: string;
+};
+
 export type Room = {
   id: string;
   name: string;

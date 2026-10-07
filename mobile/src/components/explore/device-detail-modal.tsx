@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -13,7 +14,7 @@ import { ThemedView } from "@/components/themed-view";
 import { POLLING_INTERVAL_MS } from "@/constants/api";
 import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
-import { useGetDeviceTelemetryQuery } from "@/store/api";
+import { useGetDeviceTelemetryQuery, useSendCommandMutation } from "@/store/api";
 import { AVAILABLE_METRICS, type Device, type Metric } from "@/types/telemetry";
 import { roundMetricValue } from "@/utils/telemetry";
 
@@ -65,12 +66,44 @@ export function DeviceDetailModal({ device, onClose }: Props) {
   const [range, setRange] = useState<Range>("2h");
   const [metric, setMetric] = useState<Metric>(AVAILABLE_METRICS[0]);
 
+  const [sendCommand, { isLoading: isSending }] = useSendCommandMutation();
+  const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null);
+  const [commandFeedback, setCommandFeedback] = useState<"confirmed" | "timeout" | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const from = useMemo(() => computeFrom(range), [range]);
 
   const { data: history = [] } = useGetDeviceTelemetryQuery(
     { deviceId: device?.id ?? "", from },
     { pollingInterval: POLLING_INTERVAL_MS, skip: !device },
   );
+
+  useEffect(() => {
+    if (pendingEnabled === null) return;
+    if (device?.ventilation === pendingEnabled) {
+      setPendingEnabled(null);
+      setCommandFeedback("confirmed");
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setTimeout(() => setCommandFeedback(null), 3000);
+    }
+  }, [device?.ventilation, pendingEnabled]);
+
+  const handleVentilationToggle = async () => {
+    if (!device || pendingEnabled !== null) return;
+    const desired = !device.ventilation;
+    try {
+      await sendCommand({ deviceId: device.id, enabled: desired }).unwrap();
+      setPendingEnabled(desired);
+      setCommandFeedback(null);
+      timeoutRef.current = setTimeout(() => {
+        setPendingEnabled(null);
+        setCommandFeedback("timeout");
+        setTimeout(() => setCommandFeedback(null), 4000);
+      }, 30000);
+    } catch {
+      setCommandFeedback(null);
+    }
+  };
 
   if (!device) return null;
 
@@ -155,6 +188,54 @@ export function DeviceDetailModal({ device, onClose }: Props) {
                 </ThemedText>
               </ThemedView>
             )}
+          </ThemedView>
+
+          {/* Ventilation control */}
+          <ThemedView
+            type="backgroundElement"
+            style={[styles.ventilationCard, { borderColor: theme.border }]}
+          >
+            <ThemedView style={styles.ventilationRow}>
+              <ThemedView style={{ gap: 2 }}>
+                <ThemedText type="defaultSemiBold">Climatisation</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {pendingEnabled !== null
+                    ? `En attente — ${pendingEnabled ? "activation" : "désactivation"}…`
+                    : commandFeedback === "confirmed"
+                      ? "✓ Confirmé"
+                      : commandFeedback === "timeout"
+                        ? "✗ Pas de réponse"
+                        : device.ventilation
+                          ? "Activée"
+                          : "Désactivée"}
+                </ThemedText>
+              </ThemedView>
+
+              <Pressable
+                onPress={handleVentilationToggle}
+                disabled={isSending || pendingEnabled !== null || !device.online}
+                style={[
+                  styles.ventilationBtn,
+                  {
+                    backgroundColor:
+                      isSending || pendingEnabled !== null
+                        ? theme.backgroundSelected
+                        : device.ventilation
+                          ? theme.danger
+                          : theme.success,
+                    opacity: !device.online ? 0.4 : 1,
+                  },
+                ]}
+              >
+                {isSending || pendingEnabled !== null ? (
+                  <ActivityIndicator size="small" color={theme.textSecondary} />
+                ) : (
+                  <ThemedText type="small" style={{ color: "#fff" }}>
+                    {device.ventilation ? "Désactiver" : "Activer"}
+                  </ThemedText>
+                )}
+              </Pressable>
+            </ThemedView>
           </ThemedView>
 
           {/* Current values */}
@@ -400,5 +481,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: Spacing.two,
+  },
+
+  ventilationCard: {
+    padding: Spacing.three,
+    borderRadius: Radius.large,
+    borderWidth: 1,
+  },
+
+  ventilationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: Spacing.three,
+  },
+
+  ventilationBtn: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.medium,
+    minWidth: 90,
+    alignItems: "center",
   },
 });

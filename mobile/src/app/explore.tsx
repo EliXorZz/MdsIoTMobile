@@ -15,7 +15,7 @@ import { RoomSelector } from "@/components/explore/room-selector";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { WebBadge } from "@/components/web-badge";
-import { POLLING_INTERVAL_MS } from "@/constants/api";
+
 import {
   BottomTabInset,
   ExtraWideBreakpoint,
@@ -49,9 +49,7 @@ export default function ExploreScreen() {
     error,
     fulfilledTimeStamp,
     refetch,
-  } = useGetDevicesQuery(undefined, {
-    pollingInterval: POLLING_INTERVAL_MS,
-  });
+  } = useGetDevicesQuery();
 
   // `pollingInterval` + `refetchOnReconnect` continuent de retenter l'appel toutes les
   // 5s même hors-ligne ; `isFetching` hors-ligne signale une tentative de reconnexion en cours.
@@ -62,8 +60,13 @@ export default function ExploreScreen() {
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<Metric | null>(null);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const selectedDevice = useMemo(
+    () => devices.find((d) => d.id === selectedDeviceId) ?? null,
+    [devices, selectedDeviceId],
+  );
 
   /**
    * Calcule les insets utilisés pour éviter que le contenu
@@ -355,7 +358,7 @@ export default function ExploreScreen() {
               metric={selectedMetric}
               loading={isLoading}
               cardWidthPercent={cardWidthPercent}
-              onPressDevice={setSelectedDevice}
+              onPressDevice={(device) => setSelectedDeviceId(device.id)}
             />
           </ThemedView>
         )}
@@ -366,7 +369,7 @@ export default function ExploreScreen() {
 
     <DeviceDetailModal
       device={selectedDevice}
-      onClose={() => setSelectedDevice(null)}
+      onClose={() => setSelectedDeviceId(null)}
     />
     </>
   );

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Events\DeviceAlertChanged;
+use App\Events\DeviceAvailabilityChanged;
+use App\Events\DeviceStateChanged;
+use App\Listeners\BroadcastToSSE;
 use App\Models\Device;
 use App\Models\Telemetry;
 use App\Prometheus\FixedLaravelCacheAdapter;
@@ -51,6 +55,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(DeviceStateChanged::class, BroadcastToSSE::class);
+        Event::listen(DeviceAvailabilityChanged::class, BroadcastToSSE::class);
+        Event::listen(DeviceAlertChanged::class, BroadcastToSSE::class);
+
         Event::listen(CommandStarting::class, function (CommandStarting $event) {
             if (in_array($event->command, ['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe'])) {
                 try {
