@@ -686,3 +686,78 @@ sequenceDiagram
 - Le buffer en mémoire ne contient que des `TelemetryData` déjà validés (JSON correct, `device_id` cohérent avec le topic, âge ≤ 30 s) ; **rien n'est persisté** entre la réception MQTT et le flush : un arrêt brutal du process perd les messages non encore flushés (fenêtre de perte ≤ 500 messages / 200 ms).
 - `TelemetryBatchReceived` déclenche de façon **synchrone** l'unique listener `StoreTelemetryBatch`, qui écrit le lot en base puis met à jour `devices.last_seen_at`/`room_id` et exécute l'analyse `CheckSensorFault`.
 - PostgreSQL n'intervient donc qu'à un seul point du chemin critique MQTT : l'écriture groupée (`insertOrIgnore` + `upsert`) déclenchée par le flush, ce qui bloque momentanément la boucle MQTT pendant l'écriture.
+
+---
+
+# 15. Flux descendant — Commandes et ACK
+
+## 15.1 Vue d'ensemble
+
+En complément du flux montant (télémétrie), le système supporte un flux **descendant** : le mobile envoie une commande au backend, qui la publie sur MQTT, et l'objet répond via un ACK sur un topic dédié.
+
+```mermaid
+sequenceDiagram
+    participant APP as 📱 Mobile
+    participant API as 🌐 API REST
+    participant DB as 🗄️ PostgreSQL
+    participant M as 📨 Mosquitto
+    participant OBJ as 📡 Objet/Simulateur
+    participant SUB as ⚙️ subscriber
+
+    APP->>API: POST /api/devices/{id}/commands
+    API->>DB: INSERT command (status=PENDING)
+    API->>M: PUBLISH campus/v1/devices/{id}/commands
+    API->>DB: UPDATE command (status=SENT)
+    API-->>APP: 201 {command_id, status: SENT, timeout_at}
+
+    OBJ->>M: PUBLISH campus/v1/devices/{id}/results
+    M->>SUB: MESSAGE (onResult)
+    SUB->>DB: INSERT command_result
+    SUB->>DB: UPDATE command (status=ACKNOWLEDGED)
+    SUB->>SUB: Redis PUBLISH 'sse'
+    API-->>APP: SSE event {type:state, ventilation: true}
+```
+
+## 15.2 Topics MQTT
+
+| Topic | Direction | Emetteur | Abonné | Contenu |
+|-------|-----------|----------|--------|---------|
+| `campus/v1/devices/{id}/commands` | Descendant | Backend | Objet | `command_id`, `action`, `params`, `expires_at` |
+| `campus/v1/devices/{id}/results` | Montant | Objet | Backend (subscriber) | `command_id`, `status`, `ventilation`, `executed_at` |
+
+## 15.3 Cycle de vie d'une commande
+
+```
+PENDING  →  SENT  →  ACKNOWLEDGED
+                  →  FAILED        (résultat "rejected")
+SENT (non terminal, timeout_at passé)  →  TIMEOUT  (calculé à la lecture)
+PENDING  →  FAILED                (publication MQTT échouée)
+```
+
+Le statut `TIMEOUT` n'est jamais écrit en base : il est calculé à chaque lecture par `Command::getEffectiveStatusAttribute()` si `timeout_at < now()` et que le statut n'est pas terminal. Voir [`decisions/0004-command-lifecycle.md`](decisions/0004-command-lifecycle.md) pour la justification.
+
+## 15.4 Corrélation commande / ACK
+
+Le `command_id` (UUID v7) est inclus dans le payload MQTT de la commande et echo-é dans le résultat par l'objet. `HandleCommandResult` retrouve la commande par `Command::find($command_id)`.
+
+## 15.5 Notification temps réel vers le mobile
+
+Lorsque le subscriber traite un ACK, il dispatch un événement Laravel `CommandResultReceived` qui implémente `SSEEvent`. Le listener `BroadcastToSSE` publie le payload sur le canal Redis `sse`. Le processus backend qui maintient les connexions SSE ouvertes reçoit le message et le transmet au(x) client(s) connecté(s) :
+
+```
+subscriber  →  CommandResultReceived::dispatch()
+            →  BroadcastToSSE::handle()
+            →  Redis::publish('sse', {...})
+            →  SSEService (backend HTTP)
+            →  EventSource (mobile/web)
+```
+
+Le mobile reçoit un événement `{"type":"state","device_id":"...","ventilation":true/false}` et met à jour l'UI sans poll.
+
+## 15.6 Anomalies documentées
+
+| Anomalie | Comportement | Preuve |
+|----------|-------------|--------|
+| Objet hors ligne / silencieux | Commande reste `SENT`, `effective_status` retourne `TIMEOUT` après 30 s | `no-response` sur le topic de contrôle du simulateur |
+| ACK retardé (après `timeout_at`) | ACK accepté et commande passe à `ACKNOWLEDGED` (voir décision 0004) | Log `command.late_ack` avec `current: TIMEOUT` |
+| Commande reçue deux fois | Idempotence côté objet (dict `results`) + détection doublon côté backend (`command_result` existant) | `duplicate` sur le topic de contrôle ; log `command.duplicate` |

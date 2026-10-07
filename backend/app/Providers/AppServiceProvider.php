@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Events\CommandResultReceived;
 use App\Events\DeviceAlertChanged;
 use App\Events\DeviceAvailabilityChanged;
 use App\Events\DeviceStateChanged;
@@ -58,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, BroadcastToSSE::class);
         Event::listen(DeviceAvailabilityChanged::class, BroadcastToSSE::class);
         Event::listen(DeviceAlertChanged::class, BroadcastToSSE::class);
+        Event::listen(CommandResultReceived::class, BroadcastToSSE::class);
 
         Event::listen(CommandStarting::class, function (CommandStarting $event) {
             if (in_array($event->command, ['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe'])) {

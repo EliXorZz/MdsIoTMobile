@@ -92,6 +92,11 @@ services:
       - "127.0.0.1:${REDIS_PORT:-6378}:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
     restart: unless-stopped
 
   mongodb:
@@ -148,6 +153,8 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   subscriber:
     build: ./backend
@@ -171,6 +178,8 @@ services:
       mosquitto:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
