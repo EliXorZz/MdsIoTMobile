@@ -26,8 +26,8 @@ class Device extends Model
 
     protected $casts = [
         'ventilation' => 'boolean',
-        'online'      => 'boolean',
-        'co2_alert'   => 'boolean',
+        'online' => 'boolean',
+        'co2_alert' => 'boolean',
         'last_seen_at' => 'immutable_datetime',
     ];
 

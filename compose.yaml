@@ -94,6 +94,35 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
+  mongodb:
+    image: mongo:8
+    environment:
+      MONGO_INITDB_DATABASE: datalake
+    ports:
+      - "127.0.0.1:${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     build: ./backend
     env_file: ./backend/.env
@@ -104,12 +133,18 @@ services:
       MQTT_HOST: mosquitto
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+      RABBITMQ_HOST: rabbitmq
+      MONGODB_HOST: mongodb
     volumes:
       - backend-storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
       mosquitto:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
 
   subscriber:
@@ -124,13 +159,53 @@ services:
       MQTT_USER: backend
       MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
       MQTT_ENABLE_LOGGING: "false"
-      LOG_LEVEL: error
+      MQTT_CLEAN_SESSION: "true"
+      RABBITMQ_HOST: rabbitmq
     volumes:
       - backend-storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
       mosquitto:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    env_file: ./backend/.env
+    command: ["php", "artisan", "telemetry:consume", "--batch=2000", "--timeout=5"]
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+    volumes:
+      - backend-storage:/app/storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  datalake-worker:
+    build: ./backend
+    env_file: ./backend/.env
+    command: ["php", "artisan", "datalake:consume", "--batch=500", "--timeout=5"]
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      MONGODB_HOST: mongodb
+    volumes:
+      - backend-storage:/app/storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     restart: unless-stopped
 
@@ -148,5 +223,7 @@ services:
 volumes:
   broker-data:
   postgres-data:
+  rabbitmq-data:
   redis-data:
   backend-storage:
+  mongodb-data:

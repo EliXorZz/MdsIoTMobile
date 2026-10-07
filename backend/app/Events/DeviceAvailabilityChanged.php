@@ -20,8 +20,8 @@ class DeviceAvailabilityChanged implements SSEEvent
     public function ssePayload(): array
     {
         return [
-            'device_id'   => $this->availability->device_id,
-            'online'      => $this->availability->status === AvailabilityStatus::Online,
+            'device_id' => $this->availability->device_id,
+            'online' => $this->availability->status === AvailabilityStatus::Online,
             'last_seen_at' => $this->availability->reported_at?->toIso8601String(),
         ];
     }

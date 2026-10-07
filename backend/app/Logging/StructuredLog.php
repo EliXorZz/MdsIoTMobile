@@ -13,30 +13,30 @@ final class StructuredLog
         return new self($context);
     }
 
-    public function debug(string $eventType, string $message, array $context = []): void
+    public function debug(LogEvent $event, string $message, array $context = []): void
     {
-        $this->write('debug', $eventType, $message, $context);
+        $this->write('debug', $event, $message, $context);
     }
 
-    public function info(string $eventType, string $message, array $context = []): void
+    public function info(LogEvent $event, string $message, array $context = []): void
     {
-        $this->write('info', $eventType, $message, $context);
+        $this->write('info', $event, $message, $context);
     }
 
-    public function warning(string $eventType, string $message, array $context = []): void
+    public function warning(LogEvent $event, string $message, array $context = []): void
     {
-        $this->write('warning', $eventType, $message, $context);
+        $this->write('warning', $event, $message, $context);
     }
 
-    public function error(string $eventType, string $message, array $context = []): void
+    public function error(LogEvent $event, string $message, array $context = []): void
     {
-        $this->write('error', $eventType, $message, $context);
+        $this->write('error', $event, $message, $context);
     }
 
-    private function write(string $level, string $eventType, string $message, array $context): void
+    private function write(string $level, LogEvent $event, string $message, array $context): void
     {
         Log::{$level}($message, array_filter(
-            ['eventType' => $eventType] + $context + $this->sharedContext,
+            ['eventType' => $event->value] + $context + $this->sharedContext,
             static fn ($value): bool => $value !== null,
         ));
     }

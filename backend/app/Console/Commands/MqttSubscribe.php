@@ -5,14 +5,13 @@ namespace App\Console\Commands;
 use App\Data\AvailabilityData;
 use App\Data\CommandResultData;
 use App\Data\DeviceStateData;
-use App\Data\TelemetryData;
 use App\Events\CommandResultReceived;
 use App\Events\DeviceAvailabilityChanged;
 use App\Events\DeviceStateReceived;
+use App\Events\RawTelemetryReceived;
+use App\Logging\LogEvent;
 use App\Logging\StructuredLog;
-use App\Services\TelemetryIngestionService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Redis;
 use PhpMqtt\Client\ConnectionManager;
 use PhpMqtt\Client\Exceptions\ClientNotConnectedToBrokerException;
 use PhpMqtt\Client\Exceptions\ConnectingToBrokerFailedException;
@@ -25,25 +24,18 @@ class MqttSubscribe extends Command
 
     private const RECONNECT_DELAY_S = 3;
 
-    private const MAX_TELEMETRY_AGE_S = 30;
-
     private const TOPICS = [
-        'telemetry'    => 'campus/v1/devices/+/telemetry',
-        'state'        => 'campus/v1/devices/+/state',
+        'telemetry' => 'campus/v1/devices/+/telemetry',
+        'state' => 'campus/v1/devices/+/state',
         'availability' => 'campus/v1/devices/+/availability',
-        'results'      => 'campus/v1/devices/+/results',
+        'results' => 'campus/v1/devices/+/results',
     ];
 
     private string $subscriberId;
 
-    private int $prevReceived = 0;
+    private int $telemetryCount = 0;
 
-    private float $lastStats = 0;
-
-    public function __construct(private readonly TelemetryIngestionService $ingestion)
-    {
-        parent::__construct();
-    }
+    private ?float $lastTelemetryLogAt = null;
 
     public function handle(): void
     {
@@ -55,30 +47,28 @@ class MqttSubscribe extends Command
             } catch (ConnectingToBrokerFailedException $e) {
                 StructuredLog::withContext([
                     'subscriberId' => $this->subscriberId,
-                    'reason'       => $e->getMessage(),
-                    'status'       => 'disconnected',
-                ])->error('mqtt.connection_failed', 'Cannot connect to the MQTT broker');
+                    'reason' => $e->getMessage(),
+                    'status' => 'disconnected',
+                ])->error(LogEvent::MqttConnectionFailed, 'Cannot connect to the MQTT broker');
             } catch (ClientNotConnectedToBrokerException $e) {
                 StructuredLog::withContext([
                     'subscriberId' => $this->subscriberId,
-                    'reason'       => $e->getMessage(),
-                    'status'       => 'disconnected',
-                ])->error('mqtt.subscription_failed', 'Cannot subscribe to MQTT topics');
+                    'reason' => $e->getMessage(),
+                    'status' => 'disconnected',
+                ])->error(LogEvent::MqttSubscriptionFailed, 'Cannot subscribe to MQTT topics');
             } catch (\Throwable $e) {
                 StructuredLog::withContext([
                     'subscriberId' => $this->subscriberId,
-                    'reason'       => $e->getMessage(),
-                    'status'       => 'disconnected',
-                ])->error('mqtt.connection_lost', 'MQTT loop terminated unexpectedly');
+                    'reason' => $e->getMessage(),
+                    'status' => 'disconnected',
+                ])->error(LogEvent::MqttConnectionLost, 'MQTT loop terminated unexpectedly');
             }
-
-            $this->ingestion->flush();
 
             StructuredLog::withContext([
                 'subscriberId' => $this->subscriberId,
-                'status'       => 'reconnecting',
-                'delayS'       => self::RECONNECT_DELAY_S,
-            ])->debug('mqtt.reconnect_attempt', 'Scheduling next connection attempt');
+                'status' => 'reconnecting',
+                'delayS' => self::RECONNECT_DELAY_S,
+            ])->debug(LogEvent::MqttReconnectAttempt, 'Scheduling next connection attempt');
 
             sleep(self::RECONNECT_DELAY_S);
         }
@@ -93,126 +83,61 @@ class MqttSubscribe extends Command
             $mqtt->registerConnectedEventHandler(function ($client, bool $isAutoReconnect) {
                 StructuredLog::withContext([
                     'subscriberId' => $this->subscriberId,
-                    'status'       => $isAutoReconnect ? 'reconnected' : 'connected',
-                ])->info('mqtt.connected', 'Connected to the MQTT broker');
-            });
-
-            $mqtt->registerLoopEventHandler(function () {
-                $this->ingestion->flushIfNeeded();
-
-                if (microtime(true) - $this->lastStats >= 1.0) {
-                    $this->pushStats();
-                }
+                    'status' => $isAutoReconnect ? 'reconnected' : 'connected',
+                ])->info(LogEvent::MqttConnected, 'Connected to the MQTT broker');
             });
 
             foreach (self::TOPICS as $type => $topicFilter) {
-                $mqtt->subscribe($topicFilter, $this->onMessage($type), 0);
+                $mqtt->subscribe($topicFilter, $this->onMessage($type), 1);
             }
-
-            $this->lastStats = microtime(true);
 
             StructuredLog::withContext([
                 'subscriberId' => $this->subscriberId,
-                'status'       => 'subscribed',
-                'topics'       => array_values(self::TOPICS),
-            ])->info('mqtt.subscribed', 'Subscribed to campus device topics');
+                'status' => 'subscribed',
+                'topics' => array_values(self::TOPICS),
+            ])->info(LogEvent::MqttSubscribed, 'Subscribed to campus device topics');
 
-            $mqtt->loop(true);
+            $mqtt->registerLoopEventHandler(function () {
+                $now = microtime(true);
+                $this->lastTelemetryLogAt ??= $now;
+                if ($now - $this->lastTelemetryLogAt >= 10.0) {
+                    StructuredLog::withContext([
+                        'subscriberId' => $this->subscriberId,
+                        'count' => $this->telemetryCount,
+                    ])->info(LogEvent::TelemetryReceived, 'Telemetry throughput');
+                    $this->lastTelemetryLogAt = $now;
+                }
+            });
+
+            $mqtt->loop();
         } finally {
             try {
                 $manager->disconnect();
             } catch (\Throwable) {
             }
+
+            StructuredLog::withContext([
+                'subscriberId' => $this->subscriberId,
+                'count' => $this->telemetryCount,
+            ])->info(LogEvent::TelemetryReceived, 'Subscriber disconnected — final count');
         }
     }
 
     private function onMessage(string $type): callable
     {
         return fn (string $topic, string $message) => match ($type) {
-            'telemetry'    => $this->onTelemetry($topic, $message),
-            'state'        => $this->onState($topic, $message),
+            'telemetry' => $this->onTelemetry($topic, $message),
+            'state' => $this->onState($topic, $message),
             'availability' => $this->onAvailability($topic, $message),
-            'results'      => $this->onResult($topic, $message),
-            default        => null,
+            'results' => $this->onResult($topic, $message),
+            default => null,
         };
-    }
-
-    private function pushStats(): void
-    {
-        $elapsed = microtime(true) - $this->lastStats;
-        $this->lastStats = microtime(true);
-        $rate = (int) (($this->ingestion->received() - $this->prevReceived) / $elapsed);
-        $this->prevReceived = $this->ingestion->received();
-
-        Redis::hSet('mqtt:subscribers', $this->subscriberId, json_encode([
-            'id'         => $this->subscriberId,
-            'received'   => $this->ingestion->received(),
-            'rejected'   => $this->ingestion->rejected(),
-            'rate'       => $rate,
-            'db'         => $this->ingestion->inserted(),
-            'lag'        => $this->ingestion->lag(),
-            'updated_at' => microtime(true),
-        ]));
     }
 
     private function onTelemetry(string $topic, string $message): void
     {
-        $payload = json_decode($message, true);
-        $deviceId = $this->deviceIdFromTopic($topic);
-        $eventId = is_array($payload) ? ($payload['message_id'] ?? null) : null;
-
-        $log = StructuredLog::withContext([
-            'deviceId' => $deviceId,
-            'topic'    => $topic,
-            'eventId'  => $eventId,
-        ]);
-
-        if (! is_array($payload)) {
-            $this->ingestion->reject();
-            $log->warning('telemetry.rejected', 'Malformed telemetry payload rejected', [
-                'status' => 'rejected',
-                'reason' => 'malformed_json',
-            ]);
-
-            return;
-        }
-
-        if (($payload['device_id'] ?? null) !== $deviceId) {
-            $this->ingestion->reject();
-            $log->warning('telemetry.topic_mismatch', 'Telemetry device_id does not match topic', [
-                'status'          => 'rejected',
-                'reason'          => 'device_id_mismatch',
-                'payloadDeviceId' => $payload['device_id'] ?? null,
-            ]);
-
-            return;
-        }
-
-        try {
-            $telemetry = TelemetryData::from($payload);
-
-            $ageSeconds = now()->diffInSeconds($telemetry->observed_at, true);
-            if ($ageSeconds > self::MAX_TELEMETRY_AGE_S) {
-                $this->ingestion->reject();
-                $log->warning('telemetry.stale', 'Telemetry message is too old and was rejected', [
-                    'status'     => 'rejected',
-                    'reason'     => 'stale',
-                    'observedAt' => $telemetry->observed_at->toIso8601String(),
-                    'ageSeconds' => $ageSeconds,
-                ]);
-
-                return;
-            }
-
-            $this->ingestion->push($telemetry);
-        } catch (\Throwable $e) {
-            $this->ingestion->reject();
-            $log->warning('telemetry.rejected', 'Invalid telemetry payload rejected', [
-                'status'          => 'rejected',
-                'reason'          => 'validation_failed',
-                'validationError' => $this->shortException($e),
-            ]);
-        }
+        RawTelemetryReceived::dispatch($topic, $message);
+        $this->telemetryCount++;
     }
 
     private function onState(string $topic, string $message): void
@@ -220,16 +145,16 @@ class MqttSubscribe extends Command
         $payload = json_decode($message, true);
         $log = StructuredLog::withContext([
             'deviceId' => $this->deviceIdFromTopic($topic),
-            'topic'    => $topic,
+            'topic' => $topic,
         ]);
 
         try {
             DeviceStateReceived::dispatch(DeviceStateData::from($payload));
-            $log->info('state.received', 'Device state received', ['status' => 'accepted']);
+            $log->info(LogEvent::StateReceived, 'Device state received', ['status' => 'accepted']);
         } catch (\Throwable $e) {
-            $log->warning('state.rejected', 'Invalid device state rejected', [
-                'status'          => 'rejected',
-                'reason'          => 'validation_failed',
+            $log->warning(LogEvent::StateRejected, 'Invalid device state rejected', [
+                'status' => 'rejected',
+                'reason' => 'validation_failed',
                 'validationError' => $this->shortException($e),
             ]);
         }
@@ -240,20 +165,20 @@ class MqttSubscribe extends Command
         $payload = json_decode($message, true);
         $log = StructuredLog::withContext([
             'deviceId' => $this->deviceIdFromTopic($topic),
-            'topic'    => $topic,
+            'topic' => $topic,
         ]);
 
         try {
             $availability = AvailabilityData::from($payload);
             DeviceAvailabilityChanged::dispatch($availability);
-            $log->info('availability.received', 'Device availability received', [
-                'status'       => 'accepted',
+            $log->info(LogEvent::AvailabilityReceived, 'Device availability received', [
+                'status' => 'accepted',
                 'onlineStatus' => $availability->status->value,
             ]);
         } catch (\Throwable $e) {
-            $log->warning('availability.rejected', 'Invalid availability payload rejected', [
-                'status'          => 'rejected',
-                'reason'          => 'validation_failed',
+            $log->warning(LogEvent::AvailabilityRejected, 'Invalid availability payload rejected', [
+                'status' => 'rejected',
+                'reason' => 'validation_failed',
                 'validationError' => $this->shortException($e),
             ]);
         }
@@ -265,18 +190,19 @@ class MqttSubscribe extends Command
         $eventId = is_array($payload) ? ($payload['command_id'] ?? null) : null;
         $log = StructuredLog::withContext([
             'deviceId' => $this->deviceIdFromTopic($topic),
-            'topic'    => $topic,
-            'eventId'  => $eventId,
+            'topic' => $topic,
+            'eventId' => $eventId,
         ]);
 
         try {
             $result = CommandResultData::from($payload);
             CommandResultReceived::dispatch($result);
-            $log->info('command_result.received', 'Command result received', ['status' => $result->status]);
+
+            $log->info(LogEvent::CommandResultReceived, 'Command result received', ['status' => $result->status]);
         } catch (\Throwable $e) {
-            $log->warning('command_result.rejected', 'Invalid command result rejected', [
-                'status'          => 'rejected',
-                'reason'          => 'validation_failed',
+            $log->warning(LogEvent::CommandResultRejected, 'Invalid command result rejected', [
+                'status' => 'rejected',
+                'reason' => 'validation_failed',
                 'validationError' => $this->shortException($e),
             ]);
         }
@@ -284,7 +210,7 @@ class MqttSubscribe extends Command
 
     private function deviceIdFromTopic(string $topic): string
     {
-        return explode('/', $topic)[3] ?? '';
+        return explode('/', $topic)[3] ?? 'unknown';
     }
 
     private function shortException(\Throwable $e): string

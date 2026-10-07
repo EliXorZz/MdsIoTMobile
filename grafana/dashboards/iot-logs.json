@@ -1,0 +1,180 @@
+{
+  "title": "IoT Campus — Logs & Monitoring",
+  "uid": "iot-logs",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["iot", "mqtt", "logs"],
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "links": [],
+  "panels": [
+
+    { "type": "row", "id": 1, "title": "Vue d'ensemble", "collapsed": false, "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 } },
+
+    {
+      "type": "stat", "id": 2, "title": "Erreurs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | level = `error` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "stat", "id": 3, "title": "Avertissements",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | level = `warning` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "stat", "id": 4, "title": "Anomalies capteurs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | eventType = `telemetry.anomaly` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "stat", "id": 5, "title": "Messages trop anciens",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | eventType = `telemetry.stale` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "stat", "id": 6, "title": "Reconnexions MQTT",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 3 }, { "color": "red", "value": 10 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | eventType = `mqtt.reconnect_attempt` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "stat", "id": 7, "title": "Payload rejetés",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service=\"subscriber\"} | json | eventType = `telemetry.rejected` [$__range]))", "refId": "A" }]
+    },
+
+    {
+      "type": "timeseries", "id": 8, "title": "Volume de logs par niveau",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "error" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "warning" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "info" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "debug" }, "properties": [{ "id": "color", "value": { "fixedColor": "gray", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (level) (rate({service=\"subscriber\"} | json | level != `` [2m]))",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ]
+    },
+
+    { "type": "row", "id": 10, "title": "Détection d'incidents", "collapsed": false, "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 } },
+
+    {
+      "type": "logs", "id": 11, "title": "Anomalies capteurs (valeurs hors seuil)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
+      "options": { "dedupStrategy": "none", "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"} | json | eventType = `telemetry.anomaly`", "refId": "A" }]
+    },
+
+    {
+      "type": "logs", "id": 12, "title": "Messages trop anciens (delay)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "options": { "dedupStrategy": "none", "showLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"} | json | eventType = `telemetry.stale`", "refId": "A" }]
+    },
+
+    {
+      "type": "logs", "id": 13, "title": "Payloads rejetés (invalid / mismatch)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "options": { "dedupStrategy": "none", "showLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"} | json | eventType =~ `telemetry\\.rejected|telemetry\\.topic_mismatch`", "refId": "A" }]
+    },
+
+    { "type": "row", "id": 20, "title": "MQTT — Connexion & Disponibilité", "collapsed": false, "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 } },
+
+    {
+      "type": "logs", "id": 21, "title": "Événements MQTT (connexion, reconnexion, erreurs)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 8 },
+      "options": { "dedupStrategy": "none", "showLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"} | json | eventType =~ `mqtt\\..*`", "refId": "A" }]
+    },
+
+    {
+      "type": "logs", "id": 22, "title": "Disponibilité appareils (online / offline)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 8 },
+      "options": { "dedupStrategy": "none", "showLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"} | json | eventType = `availability.received`", "refId": "A" }]
+    },
+
+    { "type": "row", "id": 30, "title": "Tous les logs", "collapsed": false, "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 } },
+
+    {
+      "type": "logs", "id": 31, "title": "Logs subscriber — tous niveaux",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 12 },
+      "options": { "dedupStrategy": "none", "showLabels": true, "showCommonLabels": false, "wrapLogMessage": false, "prettifyLogMessage": false, "enableLogDetails": true, "sortOrder": "Descending" },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service=\"subscriber\"}", "refId": "A" }]
+    }
+
+  ]
+}

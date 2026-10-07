@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Redis;
 class SSEService
 {
     private const CHANNEL = 'sse';
+
     private const READ_TIMEOUT = 20.0;
 
     public function stream(): void

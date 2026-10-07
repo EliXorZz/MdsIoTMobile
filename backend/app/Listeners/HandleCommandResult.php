@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\CommandResultReceived;
+use App\Logging\LogEvent;
 use App\Logging\StructuredLog;
 use App\Models\CommandResult;
 use App\Models\Device;
@@ -22,7 +23,7 @@ class HandleCommandResult
             'ventilation' => $r->ventilation,
             'executedAt' => $r->executed_at?->toIso8601String(),
             'reportedAt' => $r->reported_at?->toIso8601String(),
-        ])->info('command_result.received', 'Command result received');
+        ])->info(LogEvent::CommandResultReceived, 'Command result received');
 
         Device::upsert(
             [['device_id' => $r->device_id]],

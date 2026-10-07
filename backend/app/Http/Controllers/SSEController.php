@@ -13,10 +13,10 @@ class SSEController extends Controller
             fn () => $service->stream(),
             200,
             [
-                'Content-Type'      => 'text/event-stream',
-                'Cache-Control'     => 'no-cache',
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
                 'X-Accel-Buffering' => 'no',
-                'Connection'        => 'keep-alive',
+                'Connection' => 'keep-alive',
             ]
         );
     }
